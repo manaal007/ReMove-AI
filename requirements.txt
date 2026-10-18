@@ -1,0 +1,11 @@
+mediapipe
+opencv-python
+numpy
+scipy
+pandas
+scikit-learn
+joblib
+pyyaml
+streamlit
+matplotlib
+fastdtw

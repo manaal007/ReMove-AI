@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+models_store/*.joblib
+storage/db/*.db

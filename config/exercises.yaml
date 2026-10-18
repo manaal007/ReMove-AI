@@ -1,0 +1,31 @@
+# Exercises for ReMove PK (right arm only)
+# Angle ranges are STARTING VALUES. Confirm with the physiotherapy advisor.
+# Angles are in degrees, measured from unmirrored video.
+
+E1:
+  name: shoulder_abduction
+  label_en: "Raise your right arm out to the side"
+  label_ur: "اپنا دایاں بازو پہلو کی طرف اٹھائیں"
+  camera_view: front
+  side: right
+  joints: [right_shoulder, right_elbow, right_hip]
+  primary_angle: shoulder_abduction   # hip - shoulder - elbow
+  target_range_deg: [20, 90]          # patient-friendly range for v1
+  max_safe_deg: 100                   # never ask for more than this
+  min_elbow_extension_deg: 150        # arm should stay fairly straight
+  max_trunk_lean_deg: 10              # more than this = trunk compensation
+  max_speed_deg_per_s: 60
+
+E2:
+  name: shoulder_flexion
+  label_en: "Raise your right arm forward"
+  label_ur: "اپنا دایاں بازو آگے کی طرف اٹھائیں"
+  camera_view: side_right
+  side: right
+  joints: [right_shoulder, right_elbow, right_hip]
+  primary_angle: shoulder_flexion     # hip - shoulder - elbow, side view
+  target_range_deg: [20, 90]
+  max_safe_deg: 100
+  min_elbow_extension_deg: 150
+  max_trunk_lean_deg: 10
+  max_speed_deg_per_s: 60

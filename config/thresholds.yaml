@@ -1,0 +1,31 @@
+# Camera check and tracking thresholds
+# Tune these after looking at your own recordings.
+
+visibility:
+  min_landmark_visibility: 0.5   # below this a landmark is treated as missing
+  required_landmarks:            # must be visible before a session starts
+    - right_shoulder
+    - right_elbow
+    - right_wrist
+    - left_shoulder
+    - right_hip
+    - left_hip
+
+brightness:
+  min_mean_gray: 60              # too dark below this (0 to 255)
+  max_mean_gray: 220             # too bright above this
+
+framing:
+  min_body_height_fraction: 0.4  # head to hips should fill at least this much of frame height
+
+tracking:
+  gap_frames_N: 5                # pause the session if tracking is lost for this many frames
+  smoothing_window: 5            # moving average, in frames
+
+baseline:
+  min_reps: 3
+  max_reps: 5
+
+caps:
+  max_reps_per_set: 10
+  rest_prompt_after_reps: 5
