@@ -1,0 +1,17 @@
+numpy
+pandas
+scipy
+scikit-learn
+xgboost
+statsmodels
+matplotlib
+opencv-python
+mediapipe
+pillow
+torch
+torchvision
+ultralytics
+streamlit
+jupyterlab
+ipykernel
+edge-tts
