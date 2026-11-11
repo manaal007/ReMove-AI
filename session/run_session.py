@@ -30,6 +30,7 @@ from features.signals import L_HIP, L_SH, R_EL, R_HIP, R_SH, R_WR  # noqa: E402
 from pose.extract_landmarks import MODEL_PATH, ensure_model  # noqa: E402
 from session.config import TIMING_MODES, load_config  # noqa: E402
 from session.engine import SessionEngine  # noqa: E402
+from session.rules import reference_rom  # noqa: E402
 
 WIN = "ReMove PK"
 LM_IDS = (0, L_SH, R_SH, 13, R_EL, 15, R_WR, L_HIP, R_HIP)   # what the engine + check need
@@ -84,6 +85,56 @@ def draw_status(frame, s, last_text):
         put(frame, s["last_label"].replace("_", " "), (20, h - 60), c, 1.0, 2)
     if last_text:
         put(frame, last_text, (20, h - 20), WHITE, 0.6, 1)
+
+
+def _num(v, fmt):
+    return format(v, fmt) if isinstance(v, (int, float)) else "-"
+
+
+def _ratio(v, base):
+    return f"{v / base:.2f}" if isinstance(v, (int, float)) and base else "-"
+
+
+def print_summary(log, cfg):
+    """End-of-session table: each rep's duration, range and peak next to the
+    baseline and the exact cut-offs the rules used, so a label can be checked."""
+    rules, ex = cfg["rules"], cfg["exercise"]
+    b = log.baseline
+    print(f"\nEnded: {log.ended_reason}   reps: {len(log.reps)}   "
+          f"language={log.language}  timing={log.timing}  baseline restarts={log.baseline_restarts}")
+    if b:
+        src = "previous session" if log.baseline_from_previous else "this session"
+        print(f"\nBaseline ({src}, median of clean calibration reps):")
+        print(f"  duration {b['duration_s']:.2f} s   range {b['rom']:.1f} deg   "
+              f"peak {b['peak_angle']:.1f} deg   rest {b['min_angle']:.1f} deg   smoothness (SPARC) {_num(b.get('sparc'), '.2f')}")
+        print("Cut-offs used in scoring:")
+        print(f"  too_fast       duration < {rules['too_fast_frac']} x {b['duration_s']:.2f} s "
+              f"= {rules['too_fast_frac'] * b['duration_s']:.2f} s")
+        ref = reference_rom(b, cfg)
+        print(f"  reduced_range  range < {rules['reduced_range_frac']} x {ref:.1f} deg "
+              f"= {rules['reduced_range_frac'] * ref:.1f} deg   AND peak < max_safe_deg {ex['max_safe_deg']}")
+        print(f"                 (reference = min(baseline range {b['rom']:.1f}, "
+              f"max_safe {ex['max_safe_deg']} - rest {b['min_angle']:.1f}) = {ref:.1f} deg)")
+        if b.get("sparc") is not None:
+            print(f"  jerky          SPARC < {rules['jerky_sparc_ratio']} x {b['sparc']:.2f} "
+                  f"= {rules['jerky_sparc_ratio'] * b['sparc']:.2f}   (i.e. 'smooth x' column > {rules['jerky_sparc_ratio']})")
+        else:
+            print("  jerky          off (baseline has no SPARC value)")
+        print(f"  trunk          lean > {ex['max_trunk_lean_deg']} deg")
+    else:
+        print("\nNo baseline was set, so only not_tracked / trunk_compensation could fire.")
+
+    dur_b, rom_b, sparc_b = (b["duration_s"], b["rom"], b.get("sparc")) if b else (None, None, None)
+    print(f"\n  {'rep':>3} {'phase':8} {'label':19} {'dur s':>6} {'x base':>6} {'range':>6} "
+          f"{'x base':>6} {'peak':>6} {'smooth x':>8} {'lean':>5}  faults")
+    for r in log.reps:
+        f = r["features"]
+        print(f"  {r['n']:>3} {r['phase']:8} {r['label']:19} "
+              f"{_num(f.get('duration_s'), '6.2f')} {_ratio(f.get('duration_s'), dur_b):>6} "
+              f"{_num(f.get('rom'), '6.1f')} {_ratio(f.get('rom'), rom_b):>6} "
+              f"{_num(f.get('peak_angle'), '6.1f')} {_ratio(f.get('sparc'), sparc_b):>8} "
+              f"{_num(f.get('trunk_lean_max'), '5.1f')}  {r['faults']}")
+    print("  (baseline-phase reps are not scored against the baseline; their ratios are for reference)")
 
 
 def main():
@@ -157,9 +208,7 @@ def main():
     player.stop()
     log = engine.stop("video_ended" if args.video and not engine.done else "user_stopped")
 
-    print(f"\nEnded: {log.ended_reason}   reps: {len(log.reps)}")
-    for r in log.reps:
-        print(f"  rep {r['n']:2d}  {r['phase']:8s} {r['label']:20s} faults={r['faults']}")
+    print_summary(log, cfg)
     if args.log:
         with open(args.log, "w", encoding="utf-8") as f:
             json.dump(log.to_dict(), f, ensure_ascii=False, indent=2)

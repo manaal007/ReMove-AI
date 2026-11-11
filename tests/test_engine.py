@@ -132,6 +132,16 @@ def test_baseline_then_all_six_labels(cfg):
     assert s.e.done and s.e.log.ended_reason == "set_done"
 
 
+def test_slow_smooth_reps_are_not_jerky(cfg):
+    """Live-test case: 4.2 s baseline, then smooth reps of 6.2-7.6 s."""
+    s = started(cfg)
+    for _ in range(3):
+        s.rep(duration_s=4.2)
+    for d in (6.2, 6.8, 7.2, 7.6):
+        s.rep(duration_s=d)
+    assert labels(s.e)[3:] == ["good"] * 4
+
+
 def test_every_rep_prompt_sequence(cfg):
     s = started(cfg)
     for _ in range(5):

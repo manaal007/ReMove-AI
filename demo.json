@@ -1,0 +1,396 @@
+{
+  "exercise_id": "E1",
+  "language": "ur",
+  "timing": "every_rep",
+  "block_size": 3,
+  "started_at": "2026-11-11T22:38:36",
+  "ended_at": "2026-11-11T22:40:22",
+  "ended_reason": "set_done",
+  "baseline": {
+    "rom": 150.59204992039426,
+    "duration_s": 4.158266129032258,
+    "jerk_norm": 3711310.8245736915,
+    "peak_angle": 172.91779560067798,
+    "min_angle": 22.79328494662114
+  },
+  "baseline_from_previous": false,
+  "baseline_restarts": 0,
+  "reps": [
+    {
+      "n": 1,
+      "phase": "baseline",
+      "start_frame": 507,
+      "end_frame": 637,
+      "start_t": 17.70299999997951,
+      "end_t": 22.09399999998277,
+      "label": "good",
+      "faults": [],
+      "features": {
+        "n_frames": 131,
+        "nan_frac": 0.0,
+        "vis_mean": 0.9033218949805689,
+        "valid": true,
+        "duration_s": 4.424776923080207,
+        "peak_angle": 172.73324375200022,
+        "min_angle": 24.005587793476717,
+        "rom": 148.7276559585235,
+        "peak_speed": 192.51733631717607,
+        "mean_speed": 65.6679684224109,
+        "jerk_norm": 7019860.3477167385,
+        "elbow_min": 154.13186302081715,
+        "elbow_mean": 166.87747477154608,
+        "trunk_lean_max": 6.417244275940808,
+        "trunk_lean_range": 6.461513303057434
+      },
+      "used_for_baseline": true
+    },
+    {
+      "n": 2,
+      "phase": "baseline",
+      "start_frame": 698,
+      "end_frame": 822,
+      "start_t": 24.21899999998277,
+      "end_t": 28.34399999998277,
+      "label": "good",
+      "faults": [],
+      "features": {
+        "n_frames": 125,
+        "nan_frac": 0.0,
+        "vis_mean": 0.8783383212089538,
+        "valid": true,
+        "duration_s": 4.158266129032258,
+        "peak_angle": 175.35689426156102,
+        "min_angle": 22.79328494662114,
+        "rom": 152.5636093149399,
+        "peak_speed": 179.96196613353914,
+        "mean_speed": 71.64142802345948,
+        "jerk_norm": 3711310.8245736915,
+        "elbow_min": 155.03666035711515,
+        "elbow_mean": 168.6126481923074,
+        "trunk_lean_max": 4.237170331246509,
+        "trunk_lean_range": 4.937304057467243
+      },
+      "used_for_baseline": true
+    },
+    {
+      "n": 3,
+      "phase": "baseline",
+      "start_frame": 884,
+      "end_frame": 987,
+      "start_t": 30.5,
+      "end_t": 34.04699999996228,
+      "label": "good",
+      "faults": [],
+      "features": {
+        "n_frames": 104,
+        "nan_frac": 0.0,
+        "vis_mean": 0.8520507520207992,
+        "valid": true,
+        "duration_s": 3.5814368931657987,
+        "peak_angle": 172.91779560067798,
+        "min_angle": 22.325745680283713,
+        "rom": 150.59204992039426,
+        "peak_speed": 300.8714748933513,
+        "mean_speed": 82.08437099803761,
+        "jerk_norm": 3415679.6834774306,
+        "elbow_min": 156.72736340467807,
+        "elbow_mean": 167.79448840319748,
+        "trunk_lean_max": 4.75436362674634,
+        "trunk_lean_range": 4.797522190774302
+      },
+      "used_for_baseline": true
+    },
+    {
+      "n": 4,
+      "phase": "scoring",
+      "start_frame": 1070,
+      "end_frame": 1143,
+      "start_t": 36.90599999995902,
+      "end_t": 39.46899999998277,
+      "label": "too_fast",
+      "faults": [
+        "too_fast"
+      ],
+      "features": {
+        "n_frames": 74,
+        "nan_frac": 0.0,
+        "vis_mean": 0.8440136925594227,
+        "valid": true,
+        "duration_s": 2.59810958906517,
+        "peak_angle": 173.42070794799025,
+        "min_angle": 23.49295323668005,
+        "rom": 149.9277547113102,
+        "peak_speed": 362.29849552342193,
+        "mean_speed": 114.76657657593464,
+        "jerk_norm": 973154.9101566828,
+        "elbow_min": 156.6759736824252,
+        "elbow_mean": 167.7167734207424,
+        "trunk_lean_max": 4.423371303858362,
+        "trunk_lean_range": 4.494958141700067
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 5,
+      "phase": "scoring",
+      "start_frame": 1169,
+      "end_frame": 1368,
+      "start_t": 40.40599999995902,
+      "end_t": 47.06199999997625,
+      "label": "jerky",
+      "faults": [
+        "jerky"
+      ],
+      "features": {
+        "n_frames": 200,
+        "nan_frac": 0.0,
+        "vis_mean": 0.7785979929566383,
+        "valid": true,
+        "duration_s": 6.6894472361982205,
+        "peak_angle": 111.01353915339276,
+        "min_angle": 17.708641398530304,
+        "rom": 93.30489775486245,
+        "peak_speed": 196.03514748720943,
+        "mean_speed": 26.67911647244145,
+        "jerk_norm": 127462648.93368752,
+        "elbow_min": 160.01211991208862,
+        "elbow_mean": 173.06734633988796,
+        "trunk_lean_max": 2.556634575037018,
+        "trunk_lean_range": 2.639780056379955
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 6,
+      "phase": "scoring",
+      "start_frame": 1951,
+      "end_frame": 2016,
+      "start_t": 66.625,
+      "end_t": 68.81199999997625,
+      "label": "too_fast",
+      "faults": [
+        "too_fast"
+      ],
+      "features": {
+        "n_frames": 66,
+        "nan_frac": 0.015151515151515152,
+        "vis_mean": 0.8341148373755541,
+        "valid": true,
+        "duration_s": 2.22064615382204,
+        "peak_angle": 174.8811379693191,
+        "min_angle": 100.76862900787017,
+        "rom": 74.11250896144892,
+        "peak_speed": 163.7683891126298,
+        "mean_speed": 62.74485174788386,
+        "jerk_norm": 614569.4351486018,
+        "elbow_min": 149.73263649613335,
+        "elbow_mean": 165.14844942246626,
+        "trunk_lean_max": 4.670328056056658,
+        "trunk_lean_range": 4.7720494527653186
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 7,
+      "phase": "scoring",
+      "start_frame": 2068,
+      "end_frame": 2294,
+      "start_t": 70.63999999995576,
+      "end_t": 78.23399999999674,
+      "label": "jerky",
+      "faults": [
+        "jerky"
+      ],
+      "features": {
+        "n_frames": 227,
+        "nan_frac": 0.0,
+        "vis_mean": 0.815475763203289,
+        "valid": true,
+        "duration_s": 7.627601769952664,
+        "peak_angle": 173.90589894205567,
+        "min_angle": 19.794063388059,
+        "rom": 154.11183555399668,
+        "peak_speed": 119.16407199507253,
+        "mean_speed": 39.50946200369543,
+        "jerk_norm": 24593246.870502137,
+        "elbow_min": 134.6223043764103,
+        "elbow_mean": 162.70076283581173,
+        "trunk_lean_max": 2.963872755827665,
+        "trunk_lean_range": 3.0744142338786653
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 8,
+      "phase": "scoring",
+      "start_frame": 2400,
+      "end_frame": 2586,
+      "start_t": 81.84399999998277,
+      "end_t": 88.06199999997625,
+      "label": "jerky",
+      "faults": [
+        "jerky"
+      ],
+      "features": {
+        "n_frames": 187,
+        "nan_frac": 0.0,
+        "vis_mean": 0.8334008155659558,
+        "valid": true,
+        "duration_s": 6.251430107520328,
+        "peak_angle": 177.65417383208828,
+        "min_angle": 21.882226600465156,
+        "rom": 155.77194723162313,
+        "peak_speed": 172.919480784418,
+        "mean_speed": 48.68541456985159,
+        "jerk_norm": 20935613.834660225,
+        "elbow_min": 155.93329119554542,
+        "elbow_mean": 164.54191231189478,
+        "trunk_lean_max": 3.3490538005807724,
+        "trunk_lean_range": 3.5082226270119565
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 9,
+      "phase": "scoring",
+      "start_frame": 2678,
+      "end_frame": 2870,
+      "start_t": 91.20299999997951,
+      "end_t": 97.71899999998277,
+      "label": "jerky",
+      "faults": [
+        "jerky"
+      ],
+      "features": {
+        "n_frames": 193,
+        "nan_frac": 0.0,
+        "vis_mean": 0.854836204200211,
+        "valid": true,
+        "duration_s": 6.549937500003276,
+        "peak_angle": 174.029151938582,
+        "min_angle": 24.238749158948867,
+        "rom": 149.79040277963313,
+        "peak_speed": 223.67260343965387,
+        "mean_speed": 44.97712332286088,
+        "jerk_norm": 37447455.17622619,
+        "elbow_min": 63.883134958265394,
+        "elbow_mean": 145.46555360892305,
+        "trunk_lean_max": 1.751749924925156,
+        "trunk_lean_range": 3.2284437824318752
+      },
+      "used_for_baseline": false
+    },
+    {
+      "n": 10,
+      "phase": "scoring",
+      "start_frame": 2935,
+      "end_frame": 3126,
+      "start_t": 99.96899999998277,
+      "end_t": 106.375,
+      "label": "jerky",
+      "faults": [
+        "jerky"
+      ],
+      "features": {
+        "n_frames": 192,
+        "nan_frac": 0.0,
+        "vis_mean": 0.8962929261227449,
+        "valid": true,
+        "duration_s": 6.439539267033027,
+        "peak_angle": 173.85383243478236,
+        "min_angle": 24.85295009564699,
+        "rom": 149.0008823391354,
+        "peak_speed": 212.91095365503057,
+        "mean_speed": 45.14440912642382,
+        "jerk_norm": 15693095.319566293,
+        "elbow_min": 149.89405701463994,
+        "elbow_mean": 161.59859578234298,
+        "trunk_lean_max": 1.8707241386330493,
+        "trunk_lean_range": 3.226180696000836
+      },
+      "used_for_baseline": false
+    }
+  ],
+  "prompts": [
+    {
+      "t": 2.047,
+      "key": "step_back",
+      "reason": "camera"
+    },
+    {
+      "t": 8.062,
+      "key": "step_back",
+      "reason": "camera"
+    },
+    {
+      "t": 14.953,
+      "key": "start",
+      "reason": "session"
+    },
+    {
+      "t": 22.094,
+      "key": "good",
+      "reason": "rep"
+    },
+    {
+      "t": 28.344,
+      "key": "good",
+      "reason": "rep"
+    },
+    {
+      "t": 34.047,
+      "key": "good",
+      "reason": "rep"
+    },
+    {
+      "t": 39.469,
+      "key": "too_fast",
+      "reason": "rep"
+    },
+    {
+      "t": 47.062,
+      "key": "jerky",
+      "reason": "rep"
+    },
+    {
+      "t": 47.062,
+      "key": "rest",
+      "reason": "session"
+    },
+    {
+      "t": 60.453,
+      "key": "not_tracked",
+      "reason": "camera"
+    },
+    {
+      "t": 68.812,
+      "key": "too_fast",
+      "reason": "rep"
+    },
+    {
+      "t": 78.234,
+      "key": "jerky",
+      "reason": "rep"
+    },
+    {
+      "t": 88.062,
+      "key": "jerky",
+      "reason": "rep"
+    },
+    {
+      "t": 97.719,
+      "key": "jerky",
+      "reason": "rep"
+    },
+    {
+      "t": 106.375,
+      "key": "jerky",
+      "reason": "rep"
+    },
+    {
+      "t": 106.453,
+      "key": "set_done",
+      "reason": "session"
+    }
+  ]
+}

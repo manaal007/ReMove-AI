@@ -73,6 +73,43 @@ def smooth(x, window=SMOOTH):
         window, center=True, min_periods=1).mean().values
 
 
+SPARC_FC = 6.0        # Hz, highest frequency considered
+SPARC_AMP_TH = 0.10   # ignore spectrum below 10% of its peak (mostly tracking noise)
+MIN_PHASE_FRAMES = 8
+
+
+def sparc(speed, fps=FPS, fc=SPARC_FC, amp_th=SPARC_AMP_TH, pad=4):
+    """Spectral arc length of a speed profile (Balasubramanian et al. 2012/2015).
+    Always negative; more negative = less smooth. Dimensionless and, unlike
+    jerk, it does not grow with movement duration or tracking noise."""
+    speed = np.asarray(speed, dtype=float)
+    n = int(2 ** (np.ceil(np.log2(len(speed))) + pad))
+    f = np.arange(n) / n * fps
+    M = np.abs(np.fft.fft(speed, n))
+    if M.max() == 0:
+        return np.nan
+    M = M / M.max()
+    keep = f <= fc
+    f, M = f[keep], M[keep]
+    last = np.nonzero(M >= amp_th)[0][-1]
+    f, M = f[:last + 1], M[:last + 1]
+    if len(f) < 2:
+        return 0.0
+    return float(-np.sum(np.sqrt((np.diff(f) / (f[-1] - f[0])) ** 2 + np.diff(M) ** 2)))
+
+
+def phase_sparc(a, fps=FPS):
+    """SPARC of the lifting and the lowering phase separately (split at the
+    peak angle), returning the less smooth of the two. Splitting means a pause
+    at the top of the lift, which varies a lot between normal reps, is not
+    counted as jerkiness."""
+    k = int(np.argmax(a))
+    vals = [sparc(np.abs(np.gradient(p, 1 / fps)), fps)
+            for p in (a[:k + 1], a[k:]) if len(p) >= MIN_PHASE_FRAMES]
+    vals = [v for v in vals if not np.isnan(v)]
+    return min(vals) if vals else np.nan
+
+
 def rep_features(abd, elbow, lean, vis, f0, f1, fps=FPS, window=SMOOTH):
     """Features for one rep spanning frames f0..f1 (inclusive)."""
     sl = slice(int(f0), int(f1) + 1)
@@ -98,8 +135,11 @@ def rep_features(abd, elbow, lean, vis, f0, f1, fps=FPS, window=SMOOTH):
         "rom": rom,
         "peak_speed": np.abs(vel).max(),
         "mean_speed": np.abs(vel).mean(),
-        # dimensionless jerk: lower = smoother, comparable across speeds and sizes
+        # dimensionless jerk: lower = smoother. Kept for the research models, but NOT
+        # used for the jerky rule: tracking noise makes it grow ~duration^6
         "jerk_norm": (_trapz(jerk ** 2, dx=dt) * dur ** 5) / (rom ** 2 + 1e-9),
+        # smoothness used by the jerky rule (negative; more negative = less smooth)
+        "sparc": phase_sparc(a, fps),
         "elbow_min": e.min(),
         "elbow_mean": e.mean(),
         # trunk lean relative to the lean at the start of the rep (removes camera tilt)

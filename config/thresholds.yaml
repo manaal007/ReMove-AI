@@ -44,10 +44,18 @@ rep_detection:
   max_duration_s: 20             # a "rep" longer than this is dropped
 
 # Six-label rules (v1). Ratios are against the person's own baseline median.
+# STARTING VALUES: chosen from REHAB24-6 healthy-actor data, not from patients.
+# Confirm all of these with the physiotherapy advisor before clinical use.
 rules:
-  reduced_range_frac: 0.7        # rom below 70% of baseline rom -> reduced_range
-  too_fast_frac: 0.5             # duration under half of baseline duration -> too_fast
-  jerky_ratio: 3.0               # jerk_norm above 3x baseline jerk_norm -> jerky
+  # rom below 80% of the reference range -> reduced_range, where
+  # reference = min(baseline rom, max_safe_deg - baseline rest angle),
+  # so we never ask for more than max_safe_deg (REHAB24-6: flags 2% correct / 15% incorrect)
+  reduced_range_frac: 0.8
+  too_fast_frac: 0.65            # duration under 65% of baseline -> too_fast (REHAB24-6: 0% correct / 9% incorrect)
+  # smoothness = SPARC (spectral arc length) of the lift and the lowering phase,
+  # worst of the two; it does not depend on rep duration (old jerk metric did).
+  # sparc more than 1.2x worse than baseline -> jerky (REHAB24-6: 0% correct / 24% incorrect)
+  jerky_sparc_ratio: 1.2
   # trunk_compensation uses max_trunk_lean_deg from exercises.yaml
   # if several faults fire, the first in this list is the one spoken
   priority: [not_tracked, trunk_compensation, too_fast, jerky, reduced_range]

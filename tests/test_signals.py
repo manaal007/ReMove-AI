@@ -248,3 +248,73 @@ def test_matches_saved_research_features():
         if f["valid"]:
             for c in S.FEATURE_NAMES:
                 assert f[c] == pytest.approx(old[c], rel=1e-9), c
+
+
+# ---------- smoothness (SPARC) ----------
+
+NOISE_DEG = 0.8   # median frame-to-frame tracking noise measured on REHAB24-6 Ex1
+
+
+def minjerk_rep(duration_s, rom=80.0, low=10.0, hold_s=0.0, stop_start=False):
+    """Up-down rep with minimum-jerk phases (the textbook smooth movement)."""
+    def mj(n):
+        s = np.linspace(0, 1, n)
+        return 10 * s ** 3 - 15 * s ** 4 + 6 * s ** 5
+    n = int(duration_s * S.FPS)
+    h = n // 2
+    up = mj(h)
+    if stop_start:   # lift in 3 sub-movements with short stops
+        k = h // 3
+        up = np.concatenate([i / 3 + mj(k) / 3 for i in range(3)])
+        up = np.r_[up, np.ones(h - len(up))]
+    return low + rom * np.r_[up, np.ones(int(hold_s * S.FPS)), 1 - mj(n - h)]
+
+
+def median_feature(make, key, seeds=12):
+    vals = []
+    for seed in range(seeds):
+        a = make() + np.random.default_rng(seed).normal(0, NOISE_DEG, len(make()))
+        vals.append(features_for(a)[key])
+    return float(np.median(vals))
+
+
+def test_sparc_is_negative_and_smooth_is_near_ideal():
+    s = features_for(minjerk_rep(4.0))["sparc"]
+    assert -2.0 < s < -1.0
+
+
+def test_sparc_does_not_depend_on_duration_with_tracking_noise():
+    """The live-test bug: 6.2-7.6 s smooth reps vs a 4.2 s baseline were called jerky."""
+    base = median_feature(lambda: minjerk_rep(4.2), "sparc")
+    for dur in (2.5, 6.2, 7.6):
+        assert median_feature(lambda: minjerk_rep(dur), "sparc") / base == pytest.approx(1.0, abs=0.05)
+
+
+def test_old_jerk_metric_does_depend_on_duration():
+    """Documents why jerk_norm is no longer used for the jerky rule."""
+    base = median_feature(lambda: minjerk_rep(4.2), "jerk_norm")
+    assert median_feature(lambda: minjerk_rep(6.2), "jerk_norm") / base > 5
+
+
+def test_pause_at_top_is_not_jerky():
+    base = median_feature(lambda: minjerk_rep(4.2), "sparc")
+    held = median_feature(lambda: minjerk_rep(4.2, hold_s=1.5), "sparc")
+    assert held / base == pytest.approx(1.0, abs=0.05)
+
+
+@pytest.mark.parametrize("dur", [2.5, 4.2, 7.6])
+def test_stop_start_rep_is_much_less_smooth(dur):
+    base = median_feature(lambda: minjerk_rep(4.2), "sparc")
+    jerky = median_feature(lambda: minjerk_rep(dur, stop_start=True), "sparc")
+    assert jerky / base > 1.5          # rule cut-off is 1.2
+
+
+def test_wobbly_rep_is_less_smooth():
+    t = np.arange(int(4.2 * S.FPS)) / S.FPS
+    wobble = lambda: minjerk_rep(4.2) + 4 * np.sin(2 * np.pi * 2 * t) * np.sin(np.pi * t / t[-1])  # noqa: E731
+    base = median_feature(lambda: minjerk_rep(4.2), "sparc")
+    assert median_feature(wobble, "sparc") / base > 1.2
+
+
+def test_sparc_short_phase_gives_nan_not_error():
+    assert np.isnan(S.phase_sparc(np.array([1.0, 2.0, 3.0, 2.0, 1.0])))

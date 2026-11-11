@@ -61,7 +61,7 @@ def test_mean_gray_matches_opencv():
 def test_config_merges_exercise_and_thresholds(cfg):
     assert cfg["exercise_id"] == "E1"
     assert cfg["exercise"]["max_trunk_lean_deg"] == 10
-    assert cfg["rules"]["jerky_ratio"] == 3.0
+    assert cfg["rules"]["jerky_sparc_ratio"] == 1.2
     assert cfg["feedback"]["timing"] in ("every_rep", "every_3_4_reps")
 
 
