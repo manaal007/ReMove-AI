@@ -19,7 +19,8 @@ LANGS = ("ur", "en")
 
 REP_LABELS = ("good", "reduced_range", "too_fast", "jerky",
               "trunk_compensation", "not_tracked")
-PROMPTS = ("step_back", "too_dark", "start", "rest", "set_done")
+PROMPTS = ("step_back", "come_closer", "too_dark", "too_bright", "start", "rest", "set_done",
+           "adjust_position")
 
 # rep label -> phrase key (labels not listed use their own name)
 LABEL_TO_PHRASE = {
@@ -30,8 +31,8 @@ LABEL_TO_PHRASE = {
 PHRASES = {
     # --- rep feedback ---
     "good": {
-        "en": "Very good, try again.",
-        "ur": "بہت اچھے، دوبارہ کوشش کریں",
+        "en": "Very good, do the next rep.",
+        "ur": "بہت اچھے، اگلا ریپ کریں",
     },
     "raise_higher": {
         "en": "Raise your arm a little higher.",
@@ -58,6 +59,14 @@ PHRASES = {
         "en": "Step back a little so your whole body is visible.",
         "ur": "تھوڑا پیچھے ہٹیں تاکہ آپ کا پورا جسم نظر آئے",
     },
+    "come_closer": {
+        "en": "Come a little closer to the camera.",
+        "ur": "کیمرے کے تھوڑا قریب آئیں",
+    },
+    "too_bright": {
+        "en": "There is too much light behind you. Turn the camera away from the window.",
+        "ur": "پیچھے روشنی بہت زیادہ ہے، کیمرے کا رخ کھڑکی سے ہٹا دیں",
+    },
     "too_dark": {
         "en": "The room is too dark. Please turn on more light.",
         "ur": "کمرے میں روشنی کم ہے، براہ کرم روشنی بڑھائیں",
@@ -69,6 +78,10 @@ PHRASES = {
     "rest": {
         "en": "Take a short rest.",
         "ur": "تھوڑا آرام کر لیں",
+    },
+    "adjust_position": {
+        "en": "Please adjust your position and try again.",
+        "ur": "براہ کرم اپنی جگہ ٹھیک کریں اور دوبارہ کوشش کریں",
     },
     "set_done": {
         "en": "Well done, this set is complete.",

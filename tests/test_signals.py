@@ -112,6 +112,20 @@ def test_missing_pose_frame_is_nan():
     assert np.isnan(abd[1])
 
 
+def test_single_frame_dict_matches_dataframe():
+    lm = landmarks(r_el=(0.3, 0.2), r_sh=(0.42, 0.31), l_sh=(0.61, 0.29))
+    from_df = S.frame_signals(lm, 1920, 1080)
+    from_dict = S.frame_signals(lm.iloc[0].to_dict(), 1920, 1080)
+    for a, b in zip(from_df, from_dict):
+        np.testing.assert_allclose(a, b)
+
+
+def test_single_frame_dict_all_missing():
+    nan = {f"{c}{i}": np.nan for i in S.REQUIRED_LM for c in "xyv"}
+    abd, elbow, lean, vis = S.frame_signals(nan, 100, 100)
+    assert np.isnan(abd[0]) and np.isnan(vis[0])
+
+
 def test_min_vis_is_configurable():
     lm = landmarks(vis=0.6)
     assert not np.isnan(S.frame_signals(lm, 1, 1, min_vis=0.5)[0][0])

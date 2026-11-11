@@ -41,6 +41,16 @@ def test_no_orphan_phrases():
     assert used == set(M.PHRASES)
 
 
+def test_good_asks_for_the_next_rep():
+    assert M.PHRASES["good"]["ur"] == "بہت اچھے، اگلا ریپ کریں"
+    assert "next rep" in M.PHRASES["good"]["en"]
+
+
+def test_adjust_position_prompt():
+    text, path = M.get_feedback("adjust_position", "ur")
+    assert "دوبارہ کوشش" in text and path.name == "ur_adjust_position.mp3"
+
+
 def test_default_language_is_urdu():
     assert M.get_feedback("good")[0] == M.PHRASES["good"]["ur"]
 

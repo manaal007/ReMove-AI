@@ -39,9 +39,17 @@ def angle_at(b, a, c):
 def frame_signals(lm, W, H, min_vis=MIN_VIS):
     """Per-frame abduction angle, elbow angle and trunk lean (all degrees), plus
     the lowest visibility of the required landmarks. Frames where any required
-    landmark is below min_vis get NaN angles."""
+    landmark is below min_vis get NaN angles.
+
+    lm: a DataFrame (one row per frame) or a dict for a single frame
+    ({"x12": .., "y12": .., "v12": ..}); the dict path skips pandas so it is
+    cheap enough to call on every live video frame."""
+    def col(name):
+        v = lm[name]
+        return np.asarray(v.values if hasattr(v, "values") else [v], dtype=float)
+
     def P(i):
-        return np.c_[lm[f"x{i}"].values * W, lm[f"y{i}"].values * H].astype(float)
+        return np.c_[col(f"x{i}") * W, col(f"y{i}") * H]
 
     abd = angle_at(P(R_SH), P(R_HIP), P(R_EL))       # hip-shoulder-elbow
     elbow = angle_at(P(R_EL), P(R_SH), P(R_WR))      # shoulder-elbow-wrist
@@ -50,7 +58,9 @@ def frame_signals(lm, W, H, min_vis=MIN_VIS):
     trunk = mid_sh - mid_hip                         # points from hips up to shoulders
     lean = np.degrees(np.arctan2(trunk[:, 0], -trunk[:, 1]))  # 0 = upright
 
-    vis = lm[[f"v{i}" for i in REQUIRED_LM]].astype(float).min(axis=1).values
+    V = np.vstack([col(f"v{i}") for i in REQUIRED_LM])
+    # lowest visibility, skipping missing values (all missing -> NaN), like DataFrame.min
+    vis = np.where(np.isnan(V).all(axis=0), np.nan, np.where(np.isnan(V), np.inf, V).min(axis=0))
     bad = ~(vis >= min_vis)                          # NaN visibility counts as bad
     for s in (abd, elbow, lean):
         s[bad] = np.nan

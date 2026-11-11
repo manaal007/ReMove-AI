@@ -16,10 +16,11 @@ brightness:
   max_mean_gray: 220             # too bright above this
 
 framing:
-  min_body_height_fraction: 0.4  # head to hips should fill at least this much of frame height
+  min_body_height_fraction: 0.25 # head to hips should fill at least this much of frame height
+                                 # (REHAB24-6 videos are 0.26-0.32 and track well)
 
 tracking:
-  gap_frames_N: 5                # pause the session if tracking is lost for this many frames
+  gap_frames_N: 5                # pause (no camera re-check) if tracking is lost for this many frames
   smoothing_window: 5            # moving average, in frames
 
 baseline:
@@ -27,5 +28,30 @@ baseline:
   max_reps: 5
 
 caps:
-  max_reps_per_set: 10
+  max_reps_per_set: 10           # counts ALL reps, baseline reps included
   rest_prompt_after_reps: 5
+
+camera_check:
+  pass_frames: 30                # checks must pass this many frames in a row to start (once, before the session)
+  issue_hold_s: 1.5              # a camera problem must last this long before it is spoken
+  prompt_every_s: 6              # never repeat the same camera prompt within this many seconds
+
+rep_detection:
+  start_margin_deg: 10           # rep starts when the angle rises this far above the resting angle
+  end_margin_deg: 10             # rep ends when it falls back within this of the starting angle
+  min_rom_deg: 15                # smaller movements are ignored (fidgeting, not a rep)
+  min_duration_s: 1.0            # quicker movements are ignored (wind-up / follow-through swings)
+  max_duration_s: 20             # a "rep" longer than this is dropped
+
+# Six-label rules (v1). Ratios are against the person's own baseline median.
+rules:
+  reduced_range_frac: 0.7        # rom below 70% of baseline rom -> reduced_range
+  too_fast_frac: 0.5             # duration under half of baseline duration -> too_fast
+  jerky_ratio: 3.0               # jerk_norm above 3x baseline jerk_norm -> jerky
+  # trunk_compensation uses max_trunk_lean_deg from exercises.yaml
+  # if several faults fire, the first in this list is the one spoken
+  priority: [not_tracked, trunk_compensation, too_fast, jerky, reduced_range]
+
+feedback:
+  timing: every_rep              # every_rep | every_3_4_reps
+  block_size: 3                  # reps per summary when timing is every_3_4_reps (3 or 4)

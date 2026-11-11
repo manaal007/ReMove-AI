@@ -11,6 +11,7 @@ Run from inside remove-pk (needs internet):
     python scripts/make_audio.py                 # only makes files that are missing
     python scripts/make_audio.py --force         # remake every file
     python scripts/make_audio.py --lang en       # one language only
+    python scripts/make_audio.py --only good adjust_position --force   # just these phrases
 """
 import argparse
 import asyncio
@@ -49,11 +50,13 @@ async def make(lang, name, text):
     return False
 
 
-async def main(langs, force):
+async def main(langs, force, only=None):
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     failed = []
     for lang in langs:
         for name, texts in PHRASES.items():
+            if only and name not in only:
+                continue
             if not force and (AUDIO_DIR / f"{lang}_{name}.mp3").exists():
                 print("skip", f"{lang}_{name}.mp3", "(exists, use --force to remake)")
                 continue
@@ -69,5 +72,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--lang", choices=LANGS, help="only this language")
     ap.add_argument("--force", action="store_true", help="remake files that already exist")
+    ap.add_argument("--only", nargs="+", choices=sorted(PHRASES), metavar="PHRASE",
+                    help="only these phrase keys, e.g. --only good adjust_position")
     args = ap.parse_args()
-    asyncio.run(main([args.lang] if args.lang else list(LANGS), args.force))
+    asyncio.run(main([args.lang] if args.lang else list(LANGS), args.force, args.only))
