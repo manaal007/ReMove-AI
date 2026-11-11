@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.getcwd())
-from features.build_features_ex1 import frame_signals
+from features.signals import frame_signals
 from pose.extract_landmarks import extract
 
 # Three severity levels. These APPROXIMATE a messaging app, they are not official

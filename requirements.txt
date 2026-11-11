@@ -10,3 +10,4 @@ streamlit
 matplotlib
 fastdtw
 edge-tts
+pytest
