@@ -18,6 +18,7 @@ E1:
 
 E2:
   name: shoulder_flexion
+  ready: false                        # not tested live or on data yet; the app shows "coming soon"
   label_en: "Raise your right arm forward"
   label_ur: "اپنا دایاں بازو آگے کی طرف اٹھائیں"
   camera_view: side_right

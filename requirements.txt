@@ -11,3 +11,5 @@ matplotlib
 fastdtw
 edge-tts
 pytest
+starlette
+uvicorn[standard]
