@@ -8,7 +8,7 @@ storage/db/*.db
 /*.json
 logs/
 
-# web frontend
+# web frontend web/.vite/
 web/node_modules/
 web/dist/
 web/.env
