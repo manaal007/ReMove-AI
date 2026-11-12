@@ -13,8 +13,8 @@ const BONES = [
 export default function CameraFeed({ videoRef, status, onStart, points, joint, angle, showFrame = false, className = '' }) {
   const j = points?.[joint]
   return (
-    <div className={`relative overflow-hidden rounded-[20px] bg-slate-800 ${className}`}>
-      <div className="absolute inset-0 -scale-x-100">
+    <div className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative'} overflow-hidden rounded-[20px] bg-slate-800 ${className}`}>
+<div className="absolute inset-0 -scale-x-100">
         <video ref={videoRef} muted playsInline className={`h-full w-full object-cover ${status === 'on' ? '' : 'invisible'}`} />
         {points && (
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">

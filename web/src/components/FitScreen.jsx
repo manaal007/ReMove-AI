@@ -34,8 +34,7 @@ export default function FitScreen({ children }) {
     <div className="fixed inset-0 overflow-hidden bg-page">
       <div
         className="overflow-y-auto overflow-x-hidden"
-        style={{ width: m.w, height: m.h, transform: `scale(${m.s})`, transformOrigin: '0 0' }}
-      >
+        style={{ position: 'absolute', left: 0, top: 0, width: m.w, height: m.h, transform: `scale(${m.s})`, transformOrigin: '0 0' }}      >
         {children}
       </div>
     </div>
