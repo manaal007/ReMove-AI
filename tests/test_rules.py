@@ -28,7 +28,7 @@ def test_good(cfg):
     ({"valid": False}, "not_tracked"),
     ({"trunk_lean_max": 12.0}, "trunk_compensation"),
     ({"duration_s": 1.9}, "too_fast"),            # < 0.65 x 3.0 s
-    ({"sparc": -1.85}, "jerky"),                  # 1.23x less smooth than -1.5
+    ({"sparc": -2.25}, "jerky"),                  # 1.5x less smooth than -1.5
     ({"rom": 60.0, "peak_angle": 70.0}, "reduced_range"),  # < 0.8 x 80 deg
 ])
 def test_each_label(cfg, kw, label):
@@ -38,7 +38,7 @@ def test_each_label(cfg, kw, label):
 def test_cut_off_values(cfg):
     assert cfg["rules"]["too_fast_frac"] == 0.65
     assert cfg["rules"]["reduced_range_frac"] == 0.8
-    assert cfg["rules"]["jerky_sparc_ratio"] == 1.2
+    assert cfg["rules"]["jerky_sparc_ratio"] == 1.4
     assert "jerky_ratio" not in cfg["rules"]
 
 
@@ -74,6 +74,14 @@ def test_jerky_skipped_when_sparc_missing(cfg, feat_sparc, base_sparc):
 def test_jerky_skipped_for_old_baseline_without_sparc(cfg):
     old = {k: v for k, v in BASE.items() if k != "sparc"}
     assert "jerky" not in find_faults(rep(sparc=-9.0), cfg, old)
+
+
+@pytest.mark.parametrize("ratio,jerky", [
+    (1.21, False), (1.24, False),     # 2026-11-11 live test: normal reps 9-10, wrongly flagged at 1.2
+    (1.75, True),                     # same session: the real jerky rep
+])
+def test_live_test_reps(cfg, ratio, jerky):
+    assert ("jerky" in find_faults(rep(sparc=ratio * BASE["sparc"]), cfg, BASE)) == jerky
 
 
 def test_priority_order(cfg):

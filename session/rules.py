@@ -20,10 +20,11 @@ baseline exists, so those are what decide if a calibration rep is clean.
 Jerky used to compare dimensionless jerk (jerk_norm) with the baseline, but
 tracking noise makes jerk_norm grow roughly with duration^6, so slow smooth reps
 were flagged (6.2 s vs a 4.2 s baseline -> ~10x). SPARC per phase stays flat
-across 2.5-8 s on smooth synthetic reps with realistic noise. Starting cut-off
-1.2x own baseline: on REHAB24-6 Ex1 it flags 0% of correct reps and 24% of
-incorrect ones (labeled rep windows, baseline = median of first 3 correct reps
-per video, those reps not scored).
+across 2.5-8 s on smooth synthetic reps with realistic noise. Cut-off 1.4x own
+baseline: on REHAB24-6 Ex1 it flags 0% of correct reps and 10% of incorrect ones
+(labeled rep windows, baseline = median of first 3 correct reps per video, those
+reps not scored). It was 1.2x (0% / 24%), but live normal reps reached 1.21-1.24x
+and were flagged, while a real jerky rep was 1.75x.
 """
 from collections import Counter
 

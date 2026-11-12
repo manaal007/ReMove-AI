@@ -306,7 +306,7 @@ def test_pause_at_top_is_not_jerky():
 def test_stop_start_rep_is_much_less_smooth(dur):
     base = median_feature(lambda: minjerk_rep(4.2), "sparc")
     jerky = median_feature(lambda: minjerk_rep(dur, stop_start=True), "sparc")
-    assert jerky / base > 1.5          # rule cut-off is 1.2
+    assert jerky / base > 1.5          # rule cut-off is 1.4
 
 
 def test_wobbly_rep_is_less_smooth():

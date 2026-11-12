@@ -54,8 +54,10 @@ rules:
   too_fast_frac: 0.65            # duration under 65% of baseline -> too_fast (REHAB24-6: 0% correct / 9% incorrect)
   # smoothness = SPARC (spectral arc length) of the lift and the lowering phase,
   # worst of the two; it does not depend on rep duration (old jerk metric did).
-  # sparc more than 1.2x worse than baseline -> jerky (REHAB24-6: 0% correct / 24% incorrect)
-  jerky_sparc_ratio: 1.2
+  # sparc more than 1.4x worse than baseline -> jerky (REHAB24-6: 0% correct / 10% incorrect).
+  # Was 1.2 (0% / 24%), but in the 2026-11-11 live test normal reps reached 1.21-1.24x
+  # and were flagged; the real jerky rep was 1.75x. REHAB24-6 correct reps max out at 1.17x.
+  jerky_sparc_ratio: 1.4
   # trunk_compensation uses max_trunk_lean_deg from exercises.yaml
   # if several faults fire, the first in this list is the one spoken
   priority: [not_tracked, trunk_compensation, too_fast, jerky, reduced_range]
