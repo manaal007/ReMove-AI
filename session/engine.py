@@ -30,8 +30,10 @@ Feedback timing (feedback.timing, or the timing argument):
                    (session.rules.summarize_block). A partial block is spoken
                    before a rest prompt and at the end of the set.
 
-caps.max_reps_per_set counts every rep, baseline reps included, so the patient
-never does more than that in one set.
+caps.max_reps_per_set counts scored reps only: baseline reps (including failed
+baseline attempts) do not count, so a bad baseline never ends the session.
+caps.rest_prompt_after_reps counts every rep, baseline included, since rest is
+about how many reps the patient has physically done.
 """
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -118,7 +120,8 @@ class SessionEngine:
         self.counter = None
         self.baseline_feats, self.baseline_attempts = [], 0
         self.block = []
-        self.reps_done = 0
+        self.reps_done = 0                # all reps (rep numbers, rest prompts)
+        self.scored_done = 0              # scoring-phase reps only (set cap)
         self.last_label = None
 
         self.i = -1
@@ -169,7 +172,8 @@ class SessionEngine:
         return {
             "phase": self.phase, "checking": self.checking, "paused": self.paused,
             "issue": self.issue,
-            "reps_done": self.reps_done, "max_reps": self.cfg["caps"]["max_reps_per_set"],
+            "reps_done": self.reps_done, "scored_reps": self.scored_done,
+            "max_reps": self.cfg["caps"]["max_reps_per_set"],
             "baseline_reps": len(self.baseline_feats), "last_label": self.last_label,
             "angle": None if np.isnan(a) else float(a),
             "in_rep": bool(self.counter and self.counter.in_rep),
@@ -226,6 +230,8 @@ class SessionEngine:
         rec = RepRecord(self.reps_done + 1, phase, int(start), int(end),
                         self.ts[start], self.ts[end], label, faults, _clean(feat))
         self.reps_done += 1
+        if phase == "scoring":
+            self.scored_done += 1
         self.last_label = label
         t = self.ts[end]
 
@@ -237,7 +243,7 @@ class SessionEngine:
         self.log.reps.append(asdict(rec))
 
         caps = self.cfg["caps"]
-        last_rep = self.reps_done >= caps["max_reps_per_set"]
+        last_rep = phase == "scoring" and self.scored_done >= caps["max_reps_per_set"]
         self._feedback(label, t, out, speak and not (last_rep and label == "good"))
 
         if phase == "baseline":
@@ -246,14 +252,14 @@ class SessionEngine:
                 self.baseline = build_baseline(self.baseline_feats)
                 self.log.baseline = dict(self.baseline)
                 self.phase = "scoring"
-            elif self.baseline_attempts >= b["max_reps"] and not last_rep:
+            elif self.baseline_attempts >= b["max_reps"]:
                 # too few clean reps: ask to adjust and collect the baseline again
                 self.baseline_feats, self.baseline_attempts = [], 0
                 self.block = []
                 self.log.baseline_restarts += 1
                 self._say("adjust_position", "session", t, out)
 
-        if self.reps_done >= caps["max_reps_per_set"]:
+        if last_rep:
             self._end("set_done", out)
         elif self.reps_done % caps["rest_prompt_after_reps"] == 0:
             self._flush_block(t, out)

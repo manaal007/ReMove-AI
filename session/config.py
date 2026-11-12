@@ -30,5 +30,5 @@ def validate(cfg):
     b = cfg["baseline"]
     if not 1 <= b["min_reps"] <= b["max_reps"]:
         raise ValueError("baseline: need 1 <= min_reps <= max_reps")
-    if cfg["caps"]["max_reps_per_set"] <= b["min_reps"]:
-        raise ValueError("caps.max_reps_per_set must leave room for scored reps after the baseline")
+    if cfg["caps"]["max_reps_per_set"] < 1:
+        raise ValueError("caps.max_reps_per_set must be at least 1 (scored reps, baseline not counted)")

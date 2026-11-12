@@ -28,8 +28,8 @@ baseline:
   max_reps: 5
 
 caps:
-  max_reps_per_set: 10           # counts ALL reps, baseline reps included
-  rest_prompt_after_reps: 5
+  max_reps_per_set: 10           # scored reps only; baseline reps do not count
+  rest_prompt_after_reps: 5      # counts ALL reps, baseline included
 
 camera_check:
   pass_frames: 30                # checks must pass this many frames in a row to start (once, before the session)

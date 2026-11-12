@@ -47,8 +47,8 @@ PHRASES = {
         "ur": "بازو کو آرام سے اور ہموار طریقے سے حرکت دیں",
     },
     "trunk_lean": {
-        "en": "Keep your body straight, do not lean forward.",
-        "ur": "اپنا جسم سیدھا رکھیں، آگے نہ جھکیں",
+        "en": "Keep your body straight, don't lean to the side.",
+        "ur": "سیدھے کھڑے رہیں، ایک طرف نہ جھکیں",
     },
     "not_tracked": {
         "en": "I cannot see you clearly. Please stand in front of the camera.",

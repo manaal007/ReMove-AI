@@ -77,7 +77,10 @@ def draw_status(frame, s, last_text):
     else:
         head = "Scoring"
     put(frame, head, (20, 40), ORANGE if (s["checking"] or s["paused"]) else WHITE)
-    put(frame, f"Reps {s['reps_done']}/{s['max_reps']}", (20, 80), WHITE, 1.1, 3)
+    if s["phase"] == "baseline":
+        put(frame, f"Reps {s['reps_done']}", (20, 80), WHITE, 1.1, 3)
+    else:
+        put(frame, f"Reps {s['scored_reps']}/{s['max_reps']}", (20, 80), WHITE, 1.1, 3)
     if s["angle"] is not None:
         put(frame, f"Arm {s['angle']:.0f} deg{'  ^' if s['in_rep'] else ''}", (20, 120), GREY, 0.7)
     if s["last_label"]:

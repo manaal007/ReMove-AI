@@ -124,10 +124,13 @@ def test_baseline_then_all_six_labels(cfg):
     assert "not_tracked" not in s.keys("camera")   # 0.5 s loss: shorter than issue_hold_s
     assert not s.e.paused
     s.settle()
-    s.rep()                                   # 10 good -> set done
+    s.rep()                                   # 10 good (7th scored rep)
+    assert not s.e.done                       # cap counts scored reps only
+    for _ in range(3):
+        s.rep()                               # 11-13 good -> 10th scored rep, set done
 
     assert labels(s.e) == ["good"] * 4 + ["too_fast", "jerky", "reduced_range",
-                                          "trunk_compensation", "not_tracked", "good"]
+                                          "trunk_compensation", "not_tracked"] + ["good"] * 4
     assert [r["used_for_baseline"] for r in s.e.log.reps[:3]] == [True] * 3
     assert s.e.done and s.e.log.ended_reason == "set_done"
 
@@ -233,15 +236,38 @@ def test_previous_baseline_skips_calibration(cfg):
 
 # ---------------------------------------------------------------- caps + timing
 
-def test_set_cap_counts_baseline_reps(cfg):
+def test_set_cap_counts_scored_reps_only(cfg):
     s = started(cfg)
-    for _ in range(12):
+    cap, n_base = cfg["caps"]["max_reps_per_set"], cfg["baseline"]["min_reps"]
+    for _ in range(cap + n_base + 2):
         s.rep()
-    assert len(s.e.log.reps) == cfg["caps"]["max_reps_per_set"]
-    assert s.keys("session").count("rest") == 1
-    assert s.keys()[-2:] == ["good", "set_done"]      # rep 9's good, then straight to set_done
+    reps = s.e.log.reps
+    assert len(reps) == cap + n_base                  # 3 baseline + 10 scored
+    assert [r["phase"] for r in reps].count("scoring") == cap
+    assert s.e.log.ended_reason == "set_done"
+    # rest prompts count every rep, baseline included: reps 5 and 10
+    assert s.keys("session").count("rest") == 2
+    assert s.keys()[-2:] == ["good", "set_done"]      # rep 12's good, then straight to set_done
     # the last rep's "good, do the next rep" is skipped: set_done follows straight away
-    assert s.keys("rep").count("good") == cfg["caps"]["max_reps_per_set"] - 1
+    assert s.keys("rep").count("good") == cap + n_base - 1
+
+
+def test_failed_baselines_do_not_end_the_session(cfg):
+    s = started(cfg)
+    cap = cfg["caps"]["max_reps_per_set"]
+    for _ in range(2 * cfg["baseline"]["max_reps"]):  # two failed baseline rounds = 10 reps
+        s.rep(lean=15)
+    assert not s.e.done and s.e.phase == "baseline"
+    assert s.e.log.baseline_restarts == 2
+    for _ in range(cfg["baseline"]["min_reps"]):
+        s.rep()
+    assert s.e.phase == "scoring"
+    for _ in range(cap - 1):
+        s.rep()
+    assert not s.e.done
+    s.rep()
+    assert s.e.done and s.e.log.ended_reason == "set_done"
+    assert s.e.status()["scored_reps"] == cap
 
 
 def test_block_timing_summarizes_most_common_fault(cfg):
@@ -254,10 +280,13 @@ def test_block_timing_summarizes_most_common_fault(cfg):
     s.rep(high=40)
     s.rep()                                    # block 3: reduced reduced good
     s.rep(wobble=8)
-    s.rep()                                    # rep 10 -> set done: flush partial block
+    s.rep()                                    # rep 10 -> rest: flush partial block (jerky good)
+    s.rep()
+    s.rep()
+    s.rep()                                    # rep 13 = 10th scored -> block 5, then set done
     assert s.keys("rep") == []
     assert s.keys() == ["start", "good", "too_fast", "rest", "reduced_range",
-                        "jerky", "set_done"]
+                        "jerky", "rest", "good", "set_done"]
     assert [p.reason for p in s.prompts if p.key in ("too_fast", "reduced_range", "jerky")] == ["block"] * 3
 
 
