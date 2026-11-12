@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0B1F3A;
+  --color-navy-700: #13294B;
+  --color-teal: #14B8A6;
+  --color-teal-dark: #0F766E;
+  --color-teal-light: #5EEAD4;
+  --color-teal-50: #E6FFFA;
+  --color-gold: #F5B841;
+  --color-page: #F7FAFC;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", "Inter", serif;
+  --shadow-card: 0 4px 20px rgba(11, 31, 58, 0.07);
+  --shadow-teal: 0 8px 24px rgba(20, 184, 166, 0.3);
+}
+
+html { background: var(--color-page); color: var(--color-navy); }
+body { margin: 0; font-family: var(--font-sans); font-size: 18px; }
+
+/* Urdu text: Nastaliq needs a taller line height */
+.font-urdu, html[lang="ur"] body { font-family: var(--font-urdu); line-height: 2; }
+html[lang="ur"] .font-en { font-family: var(--font-sans); line-height: 1.4; }
+
+:focus-visible { outline: 3px solid var(--color-teal); outline-offset: 3px; }
+
+@keyframes wave { 0%, 100% { transform: scaleY(0.35) } 50% { transform: scaleY(1) } }
+.wave-bar { display: inline-block; width: 4px; height: 22px; border-radius: 2px; background: var(--color-teal-dark); animation: wave 0.9s ease-in-out infinite; }
+
+@keyframes livepulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
+.live-dot { animation: livepulse 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-bar, .live-dot { animation: none; }
+}
