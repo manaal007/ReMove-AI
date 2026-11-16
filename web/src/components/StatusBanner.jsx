@@ -22,6 +22,9 @@ export default function StatusBanner({ status, connected, error }) {
   } else if (error && error !== 'connection') {
     text = error
     tone = 'bg-red-100 text-red-900'
+  } else if (status?.phase === 'weight') {
+    if (status.weight !== 'detect') return null      // the weight question card is showing
+    text = STRINGS.weightChecking[lang]
   } else if (status?.checking) {
     const issue = status.issue && ISSUE[status.issue]
     text = `${STRINGS.cameraCheck[lang]}: ${issue ? issue[lang] : STRINGS.holdStill[lang]}`

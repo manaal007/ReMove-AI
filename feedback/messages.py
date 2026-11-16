@@ -25,7 +25,8 @@ LANGS = ("ur", "en")
 REP_LABELS = ("good", "reduced_range", "too_fast", "jerky",
               "trunk_compensation", "not_tracked")
 PROMPTS = ("step_back", "come_closer", "too_dark", "too_bright", "start", "rest", "set_done",
-           "adjust_position", "turn_sideways")
+           "adjust_position", "turn_sideways",
+           "weight_ask_none", "weight_ask_light", "weight_ask_heavy")
 
 # rep label -> phrase key (labels not listed use their own name)
 LABEL_TO_PHRASE = {
@@ -117,6 +118,19 @@ PHRASES = {
     "too_dark": {
         "en": "The room is too dark. Please turn on more light.",
         "ur": "کمرے میں روشنی کم ہے، براہ کرم روشنی بڑھائیں",
+    },
+    # --- weight check, before calibration (E3 / E4) ---
+    "weight_ask_none": {
+        "en": "We see: no weight. Is that right?",
+        "ur": "ہمیں لگتا ہے: کوئی وزن نہیں۔ کیا یہ درست ہے؟",
+    },
+    "weight_ask_light": {
+        "en": "We see: a light weight. Is that right?",
+        "ur": "ہمیں لگتا ہے: ہلکا وزن۔ کیا یہ درست ہے؟",
+    },
+    "weight_ask_heavy": {
+        "en": "We see: a heavy weight. Is that right?",
+        "ur": "ہمیں لگتا ہے: بھاری وزن۔ کیا یہ درست ہے؟",
     },
     "start": {
         "en": "Get ready. You can start now.",

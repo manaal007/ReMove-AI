@@ -19,6 +19,25 @@ framing:
   min_body_height_fraction: 0.25 # head to hips should fill at least this much of frame height
                                  # (REHAB24-6 videos are 0.26-0.32 and track well)
 
+weight_check:                    # before calibration, exercises with weight_limb (E3, E4)
+  model: models_store/efficientdet_lite0.tflite   # MediaPipe Object Detector, COCO class "bottle"
+  window_s: 4.0                  # look for a weight this long (from the first frame with the limb seen)
+  crop_limb_lengths: 2.5         # detect on a square around the wrist / ankle this many limb lengths wide
+                                 # (whole-frame detection found hand-held bottles in only 0-10% of frames)
+  min_score: 0.15                # detector confidence
+  max_distance_limbs: 0.5        # box edge within this many limb lengths of the wrist / ankle
+  min_box_ratio: 0.15            # box height / limb length (forearm for E3, shin for E4):
+  max_box_ratio: 1.2             #   outside this range it is not a bottle (false boxes were ~2x the shin)
+  min_hit_fraction: 0.03         # bottle in at least this share of the frames with the limb seen ...
+  min_hits: 2                    # ... and at least this many frames -> light / heavy, else none
+                                 # (own clips, first 4 s at 15 fps: 10/10 right; all 4 s windows 56/61,
+                                 #  2 false "weight" windows on no-weight clips; 0.05 missed 2 hand-held)
+  heavy_min_ratio:               # median box height / limb length at or above this -> heavy
+    E3: 1.0                      #   forearm ~25 cm: 0.5 L bottle ~20 cm (0.8), 1.5 L ~32 cm (1.3)
+    E4: 0.65                     #   shin ~40 cm: 0.5 L ~0.5, 1.5 L ~0.8
+                                 # STARTING VALUES from bottle sizes: own clips (all small bottles,
+                                 # 0.4-0.8) never tested heavy. The patient confirms every time.
+
 side_view:                       # side-view exercises only (E3, E4)
   max_shoulder_torso_ratio: 0.6  # shoulder width / torso length above this -> turn_sideways
                                  # (own recordings: front view 0.64-0.72, side view mostly < 0.4,

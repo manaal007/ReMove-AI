@@ -52,6 +52,7 @@ E3:
   joints: [shoulder, elbow, wrist]
   primary_angle: elbow_flexion        # 180 - (shoulder - elbow - wrist): 0 = straight, rises as the elbow bends
   required_landmarks: [shoulder, elbow, wrist, hip]
+  weight_limb: [elbow, wrist]         # weight check: a bottle near the wrist, sized against the forearm
   target_range_deg: [10, 120]         # volunteers (healthy) reached 120-165
   max_safe_deg: 145                   # normal adult elbow flexion is about 145-150
   compensation:
@@ -73,6 +74,7 @@ E4:
   joints: [hip, knee, ankle]
   primary_angle: knee_angle           # hip - knee - ankle: ~90 sitting, 180 = straight leg
   required_landmarks: [shoulder, hip, knee, ankle]   # shoulder: for the trunk angle
+  weight_limb: [knee, ankle]          # weight check: a bottle tied near the ankle, sized against the shin
   target_range_deg: [90, 160]         # volunteers (healthy) rested at 85-96 and reached 150-175
   max_safe_deg: 180                   # a straight knee; never ask for more
   compensation:

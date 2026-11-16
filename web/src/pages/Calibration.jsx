@@ -8,6 +8,7 @@ import { ArrowNext, Check, Eye } from '../components/Icons.jsx'
 import ExerciseAvatar from '../components/ExerciseAvatar.jsx'
 import CameraFeed from '../components/CameraFeed.jsx'
 import StatusBanner from '../components/StatusBanner.jsx'
+import WeightQuestion from '../components/WeightQuestion.jsx'
 import useCamera from '../hooks/useCamera.js'
 import usePoseStream from '../hooks/usePoseStream.js'
 import useVoice from '../hooks/useVoice.js'
@@ -16,14 +17,14 @@ import { api } from '../lib/api.js'
 // Practice reps -> personal baseline. The engine (session/engine.py, "baseline" phase)
 // keeps only clean reps and stops here once it has baseline.min_reps of them.
 export default function Calibration() {
-  const { ex, side, lang, patient, mock, setBaseline } = useApp()
+  const { ex, side, lang, patient, mock, setBaseline, weight, setWeight } = useApp()
   const nav = useNavigate()
   const cam = useCamera(true)
   const voice = useVoice({ lang, muted: false })
   const [lastBaseline, setLastBaseline] = useState(null)
 
   const pose = usePoseStream({
-    videoRef: cam.videoRef, ex, mode: 'calibration', lang, patientId: patient?.id,
+    videoRef: cam.videoRef, ex, mode: 'calibration', weight, lang, patientId: patient?.id,
     active: cam.status === 'on' || mock, onPrompt: voice.speak,
   })
 
@@ -65,6 +66,10 @@ export default function Calibration() {
               <Eye /><Txt k="followMe" />
             </span>
             <StatusBanner status={pose.status} connected={pose.connected} error={pose.error} />
+            {pose.weightAsk && (
+              <WeightQuestion suggested={pose.weightAsk.suggested}
+                onChoose={(c) => { voice.stop(); setWeight(c); pose.chooseWeight(c) }} />
+            )}
           </div>
           <CameraFeed videoRef={cam.videoRef} status={cam.status} onStart={cam.start} points={pose.points} joint={ex.joint} angle={pose.angle}
             className="min-h-[400px] min-w-0 flex-[1_1_480px]" />

@@ -23,13 +23,13 @@ export const EXERCISES = {
     id: 'E3', group: 'arm', kind: 'elbow', joint: 'elbow', angleKey: 'elbowBend',
     title: 'e3Title', label_en: 'Bend your elbow, then straighten it', label_ur: 'کہنی موڑیں، پھر سیدھی کریں',
     camera_view: 'side', side: null, rest_deg: 10, target_deg: 120, max_safe_deg: 145,
-    max_reps: 10, baseline_reps: 3,
+    max_reps: 10, baseline_reps: 3, weight_check: true,
   },
   E4: {
     id: 'E4', group: 'leg', kind: 'knee', joint: 'knee', angleKey: 'kneeAngle', avatarRest: 90,
     title: 'e4Title', label_en: 'Sit, straighten your knee, then bend it', label_ur: 'بیٹھ کر گھٹنا سیدھا کریں، پھر موڑیں',
     camera_view: 'side', side: null, rest_deg: 90, target_deg: 160, max_safe_deg: 180,
-    max_reps: 10, baseline_reps: 3,
+    max_reps: 10, baseline_reps: 3, weight_check: true,
   },
 }
 

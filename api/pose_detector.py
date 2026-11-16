@@ -28,6 +28,7 @@ class PoseDetector:
             running_mode=vision.RunningMode.VIDEO, num_poses=1,
             min_pose_detection_confidence=0.5, min_tracking_confidence=0.5)
         self.landmarker = vision.PoseLandmarker.create_from_options(options)
+        self.last_rgb = None
 
     def detect(self, jpeg, t_ms):
         """Returns (landmark dict or None, mean gray 0-255, width, height)."""
@@ -36,6 +37,7 @@ class PoseDetector:
             raise ValueError("could not decode JPEG frame")
         H, W = img.shape[:2]
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.last_rgb = rgb                      # the weight check runs its bottle detector on this frame
         result = self.landmarker.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), int(t_ms))
         lm = None
         if result.pose_landmarks:

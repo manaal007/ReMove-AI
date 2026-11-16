@@ -15,6 +15,7 @@ export function AppProvider({ children }) {
   const [exercise, setExercise] = useState(null)    // exercise id: 'E1' | 'E2' | 'E3' | 'E4'
   const [side, setSide] = useState(null)            // 'left' | 'right'
   const [baseline, setBaseline] = useState(null)    // engine baseline from calibration
+  const [weight, setWeight] = useState(null)        // patient's answer to the weight check: none | light | heavy
   const [result, setResult] = useState(null)        // session summary
   const [exercises, setExercises] = useState(EXERCISES)
   const [serverOk, setServerOk] = useState(MOCK ? null : undefined) // undefined = checking
@@ -56,10 +57,10 @@ export function AppProvider({ children }) {
       // usable now? (exercises marked ready: false in config show "coming soon")
       available: (e) => MOCK || (!e.mockOnly && e.ready !== false),
       patient, setPatient, exercise, setExercise, side, setSide,
-      baseline, setBaseline, result, setResult,
-      resetSession: () => { setBaseline(null); setResult(null) },
+      baseline, setBaseline, result, setResult, weight, setWeight,
+      resetSession: () => { setBaseline(null); setResult(null); setWeight(null) },
     }
-  }, [lang, patient, exercise, side, baseline, result, exercises, serverOk])
+  }, [lang, patient, exercise, side, baseline, result, exercises, serverOk, weight])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

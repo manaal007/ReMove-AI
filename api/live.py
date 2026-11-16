@@ -8,20 +8,33 @@ tests). api/server.py only moves bytes between the WebSocket and this class.
 Protocol (browser -> server)
   text   {"type": "start", "mode": "calibration" | "session", "exercise": "E1",
           "lang": "ur" | "en", "timing": null | "every_rep" | "every_3_4_reps",
-          "baseline": {...} | null, "patient_id": 1 | null}
+          "baseline": {...} | null, "patient_id": 1 | null,
+          "weight": null | "none" | "light" | "heavy"}
   bytes  one JPEG frame, NOT mirrored (pose angles in config are unmirrored)
+  text   {"type": "weight", "choice": "none" | "light" | "heavy"}   the patient's answer
   text   {"type": "stop"}
 
 Protocol (server -> browser)
   {"type": "ready", "mode", "exercise": {...}}                       after start
   {"type": "frame", "status": {...}, "points": {...} | null,
    "prompts": [...], "reps": [...]}                                  one per JPEG
+  {"type": "weight", "suggested": "none" | "light" | "heavy", "evidence": {...},
+   "prompt": {...}}                           weight check: ask the patient
+  {"type": "weight_saved", "chosen": ...}     after the patient's answer
   {"type": "baseline", "baseline": {...}}     calibration: baseline is ready
   {"type": "done", "summary": {...}}          set finished / stopped
   {"type": "error", "message": "..."}
 
 The browser sends the next frame only after it gets the "frame" reply, so a
 slow laptop never builds a backlog: the frame rate simply drops.
+
+Weight check (exercises with weight_limb, E3/E4, when start has no "weight"):
+before the engine sees any frame, a bottle near the wrist / ankle is looked for
+for weight_check.window_s (capture/weight_check.py), the suggestion is sent with a
+spoken question, and frames are ignored until the patient answers. Their choice
+is final and is saved with the session (summary["weight"], sessions.weight).
+The browser passes the choice from calibration in the session's start message,
+so the check runs once. Without a bottle detector (tests, model missing) it is skipped.
 
 Calibration mode stops as soon as the engine has a baseline (min_reps clean
 reps). Session mode is started with that baseline, so the engine goes straight
@@ -32,10 +45,12 @@ import time
 
 import numpy as np
 
+from capture.weight_check import (WEIGHT_CLASSES, WeightVote, crop_region, has_weight_check,
+                                  limb_geometry, observe)
 from feedback.messages import LANGS, get_feedback, phrase_key
 from features.signals import SIDE_LM, best_side
 from session.config import TIMING_MODES, is_side_view, load_config
-from session.engine import SessionEngine
+from session.engine import Prompt, SessionEngine
 
 # front view (E1): the subject's right arm plus the other shoulder / hip
 POINT_IDS = {"shoulder": 12, "elbow": 14, "wrist": 16, "hip": 24,
@@ -58,6 +73,7 @@ def exercise_info(exercise_id, cfg=None):
         "max_reps": cfg["caps"]["max_reps_per_set"],
         "ready": bool(ex.get("ready", True)),
         "baseline_reps": cfg["baseline"]["min_reps"],
+        "weight_check": has_weight_check(ex),
     }
 
 
@@ -126,11 +142,15 @@ def points(lm, min_vis=0.5, ex=None, side=None):
 
 
 class LiveSession:
-    def __init__(self, detector_factory, store=None, clock=time.monotonic):
+    def __init__(self, detector_factory, store=None, clock=time.monotonic, bottle_factory=None):
         self.detector_factory = detector_factory
+        self.bottle_factory = bottle_factory      # cfg -> BottleDetector, or None: no weight check
+        self.bottle = None
         self.store = store
         self.clock = clock
         self.detector = None
+        self.weight = {"suggested": None, "chosen": None}
+        self.weight_state = None
         self.engine = None
         self.cfg = None
         self.started = False
@@ -157,6 +177,17 @@ class LiveSession:
         self.mode, self.lang, self.timing = mode, lang, timing
         self.baseline = clean_baseline(msg.get("baseline")) if mode == "session" else None
         self.patient_id = msg.get("patient_id")
+        chosen = msg.get("weight")
+        if chosen is not None and chosen not in WEIGHT_CLASSES:
+            raise ValueError(f"weight must be one of {WEIGHT_CLASSES}")
+        self.weight = {"suggested": None, "chosen": chosen}
+        self.weight_state = None                          # None | "detect" | "ask"
+        if chosen is None and has_weight_check(self.cfg["exercise"]) and self.bottle_factory is not None:
+            if self.bottle is None:
+                self.bottle = self.bottle_factory(self.cfg)
+            if self.bottle is not None:
+                self.weight_state = "detect"
+                self.vote = WeightVote(self.cfg, self.exercise_id)
         if self.detector is None:
             self.detector = self.detector_factory()
         self.started = True
@@ -175,6 +206,8 @@ class LiveSession:
         self.last_ms = ms
 
         lm, gray, W, H = self.detector.detect(jpeg, ms)
+        if self.weight_state is not None:
+            return self._weight_frame(t, lm, W, H)
         if self.engine is None:
             self.engine = SessionEngine(self.cfg, W, H, language=self.lang,
                                         timing=self.timing, baseline=self.baseline)
@@ -201,6 +234,42 @@ class LiveSession:
             out += self._finish(self.engine.log.ended_reason)
         return out
 
+    def choose_weight(self, choice):
+        """The patient's answer to the weight question: final, saved with the session."""
+        if not self.started:
+            raise RuntimeError("send a start message first")
+        if choice not in WEIGHT_CLASSES:
+            raise ValueError(f"weight must be one of {WEIGHT_CLASSES}")
+        self.weight["chosen"] = choice
+        self.weight_state = None                          # the engine starts on the next frame
+        return [{"type": "weight_saved", "chosen": choice}]
+
+    def _weight_frame(self, t, lm, W, H):
+        ex = self.cfg["exercise"]
+        out = []
+        if self.weight_state == "detect":
+            geo = limb_geometry(lm, ex, W, H) if lm is not None else None
+            ratio = None
+            if geo is not None:
+                region = crop_region(geo[0], geo[1], W, H, self.cfg)
+                rgb = getattr(self.detector, "last_rgb", None)
+                if region is not None:
+                    ratio = observe(self.bottle.detect(rgb, region), geo[0], geo[1], self.cfg)
+            self.vote.add(t, ratio, geo is not None)
+            if self.vote.ready(t):
+                res = self.vote.result()
+                self.weight.update(suggested=res["suggested"], evidence=res)
+                self.weight_state = "ask"
+                key = f"weight_ask_{res['suggested']}"
+                text, audio = get_feedback(key, self.lang)
+                out.append({"type": "weight", "suggested": res["suggested"], "evidence": res,
+                            "prompt": prompt_dict(Prompt(key, text, str(audio), "session", key))})
+        status = {"phase": "weight", "checking": True, "paused": False, "weight": self.weight_state,
+                  "issue": None if lm is not None else "not_tracked", "angle": None, "in_rep": False}
+        frame = {"type": "frame", "status": status, "prompts": [], "reps": [],
+                 "points": points(lm, self.cfg["visibility"]["min_landmark_visibility"], ex=ex)}
+        return [frame] + out
+
     def stop(self, reason="user_stopped"):
         if self.finished or self.engine is None:
             self.finished = True
@@ -211,6 +280,9 @@ class LiveSession:
         if self.detector is not None:
             self.detector.close()
             self.detector = None
+        if self.bottle is not None:
+            self.bottle.close()
+            self.bottle = None
 
     # ------------------------------------------------------------------ end
 
@@ -230,6 +302,7 @@ class LiveSession:
             "good_reps": sum(r["label"] == "good" for r in scored),
             "avg_peak": round(float(np.mean(peaks)), 1) if peaks else None,
             "best_peak": max(peaks) if peaks else None,
+            "weight": dict(self.weight),
         }
         if self.store is not None:
             summary["session_id"] = self.store.save_session(self.patient_id, summary, log.to_dict())

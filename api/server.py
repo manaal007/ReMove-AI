@@ -48,6 +48,16 @@ def default_detector():
     return PoseDetector()
 
 
+def default_bottle_detector(cfg):
+    """Bottle detector for the weight check, or None (check skipped) if the model is missing."""
+    from api.object_detector import BottleDetector
+    try:
+        return BottleDetector(cfg["weight_check"]["model"])
+    except FileNotFoundError as e:
+        log.warning("weight check off: %s", e)
+        return None
+
+
 def list_exercises():
     with open(Path(CONFIG_DIR) / "exercises.yaml", encoding="utf-8") as f:
         ids = list(yaml.safe_load(f))
@@ -94,7 +104,8 @@ async def patient_baseline(request):
 
 async def ws_session(ws: WebSocket):
     await ws.accept()
-    live = LiveSession(ws.app.state.detector_factory, store=ws.app.state.store)
+    live = LiveSession(ws.app.state.detector_factory, store=ws.app.state.store,
+                       bottle_factory=ws.app.state.bottle_factory)
     try:
         while True:
             msg = await ws.receive()
@@ -108,6 +119,8 @@ async def ws_session(ws: WebSocket):
                     kind = data.get("type")
                     if kind == "start":
                         out = await run_in_threadpool(live.start, data)
+                    elif kind == "weight":
+                        out = live.choose_weight(data.get("choice"))
                     elif kind == "stop":
                         out = live.stop(data.get("reason", "user_stopped"))
                     else:
@@ -135,7 +148,7 @@ async def spa(request):
     return FileResponse(WEB_DIST / "index.html")
 
 
-def create_app(store=None, detector_factory=default_detector, cors_origins=("http://localhost:5173", "http://127.0.0.1:5173")):
+def create_app(store=None, detector_factory=default_detector, bottle_factory=default_bottle_detector, cors_origins=("http://localhost:5173", "http://127.0.0.1:5173")):
     routes = [
         Route("/api/health", health),
         Route("/api/exercises", exercises),
@@ -153,6 +166,7 @@ def create_app(store=None, detector_factory=default_detector, cors_origins=("htt
     ])
     app.state.store = store if store is not None else Store()
     app.state.detector_factory = detector_factory
+    app.state.bottle_factory = bottle_factory
     return app
 
 

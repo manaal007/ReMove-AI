@@ -21,7 +21,7 @@ let msgId = 0
 const coachMsg = (p) => ({ id: ++msgId, kind: 'coach', en: p.en, ur: p.ur, tag: p.tag ?? 'adjust', dir: p.dir, audio: p.audio, key: p.key })
 const systemMsg = (en, ur) => ({ id: ++msgId, kind: 'system', en, ur })
 
-export default function usePoseStream({ videoRef, ex, mode, baseline, patientId, lang, active, onPrompt }) {
+export default function usePoseStream({ videoRef, ex, mode, baseline, weight, patientId, lang, active, onPrompt }) {
   const [angle, setAngle] = useState(0)
   const [points, setPoints] = useState(null)
   const [reps, setReps] = useState([])
@@ -30,6 +30,9 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
   const [baselineOut, setBaselineOut] = useState(null)
   const [summary, setSummary] = useState(null)
   const [connected, setConnected] = useState(MOCK)
+  // weight check before calibration: { suggested: 'none' | 'light' | 'heavy', evidence } until answered
+  const [weightAsk, setWeightAsk] = useState(null)
+  const mockWeightRef = useRef(null)
   const [error, setError] = useState(null)
 
   const onPromptRef = useRef(onPrompt)
@@ -81,7 +84,7 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
 
     ws.onopen = () => {
       setConnected(true)
-      ws.send(JSON.stringify({ type: 'start', mode, exercise: ex.id, lang, baseline: baseline ?? null, patient_id: patientId ?? null }))
+      ws.send(JSON.stringify({ type: 'start', mode, exercise: ex.id, lang, baseline: baseline ?? null, patient_id: patientId ?? null, weight: weight ?? null }))
     }
     ws.onclose = () => { setConnected(false); closed = true }
     ws.onerror = () => { setConnected(false); setError('connection') }
@@ -96,6 +99,11 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
         setPoints(d.points)
         for (const p of d.prompts || []) addPrompt(p)
         for (const r of d.reps || []) addRep(r)
+      } else if (d.type === 'weight') {
+        setWeightAsk({ suggested: d.suggested, evidence: d.evidence })
+        if (d.prompt) addPrompt(d.prompt)          // spoken: "We see: a light weight. Is that right?"
+      } else if (d.type === 'weight_saved') {
+        setWeightAsk(null)
       } else if (d.type === 'baseline') {
         setBaselineOut(d.baseline)
       } else if (d.type === 'done') {
@@ -120,6 +128,14 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
     const total = mode === 'calibration' ? ex.baseline_reps : ex.max_reps
     const typical = baseline?.peak_angle ?? rest + (target - rest) * 0.85
     const sim = { t: 0, rep: 0, peak: 0, warned: false, lean: false, done: false, started: false, peaks: [] }
+    // mock weight check: always "sees" a light weight, then waits for the answer
+    sim.weightWait = Boolean(ex.weight_check) && weight == null
+    if (sim.weightWait) {
+      setStatus({ phase: 'weight', checking: true, weight: 'ask', issue: null })
+      setWeightAsk({ suggested: 'light', evidence: null })
+      addPrompt({ key: 'weight_ask_light', en: 'We see: a light weight. Is that right?', ur: 'ہمیں لگتا ہے: ہلکا وزن۔ کیا یہ درست ہے؟', tag: 'adjust' })
+      mockWeightRef.current = () => { sim.weightWait = false }
+    }
     const newRep = () => {
       sim.peak = Math.min(ex.max_safe_deg, typical + (Math.random() - 0.4) * 20)
       sim.lean = mode === 'session' && Math.random() < 0.2
@@ -139,7 +155,7 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
 
     const DT = 50
     const id = setInterval(() => {
-      if (!activeRef.current || sim.done) return
+      if (!activeRef.current || sim.done || sim.weightWait) return
       if (!sim.started) {
         sim.started = true
         setStatus({ phase: mode === 'calibration' ? 'baseline' : 'scoring', checking: false, issue: null })
@@ -184,9 +200,16 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, patientId,
   }, [ex?.id, mode])
 
   const stop = useCallback(() => stopRef.current(), [])
+  // the patient's answer is final: the server saves it with the session and starts calibration
+  const chooseWeight = useCallback((choice) => {
+    setWeightAsk(null)
+    if (MOCK) { mockWeightRef.current?.(); return }
+    const ws = wsRef.current
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'weight', choice }))
+  }, [])
   const posture = status.last_label === 'trunk_compensation' ? 'lean' : 'good'
 
-  return { angle, posture, points, reps, messages, status, baselineOut, summary, connected, error, stop, mock: MOCK }
+  return { angle, posture, points, reps, messages, status, baselineOut, summary, connected, error, stop, weightAsk, chooseWeight, mock: MOCK }
 }
 
 // Fake skeleton for mock mode (unmirrored image coords, 0–1; the patient's right arm is on image-left)

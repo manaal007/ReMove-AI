@@ -43,7 +43,7 @@ export default function Summary() {
   const top = Math.max(r.target, ...history.map((h) => h.avg)) * 1.1
 
   const share = async () => {
-    const text = `ReMove PK — ${patient?.name ?? ''}\n${exercises[r.exercise]?.label_en ?? r.exercise} (${r.side}), ${new Date(r.date).toLocaleDateString()}\nReps: ${r.reps.length}/${r.total}\nAverage: ${r.avg}° (target ${r.target}°), best ${r.best}°\nGood posture: ${r.goodPosture}/${r.reps.length}\nTime: ${fmt(r.seconds)}`
+    const text = `ReMove PK — ${patient?.name ?? ''}\n${exercises[r.exercise]?.label_en ?? r.exercise} (${r.side}), ${new Date(r.date).toLocaleDateString()}\nReps: ${r.reps.length}/${r.total}\nAverage: ${r.avg}° (target ${r.target}°), best ${r.best}°\nGood posture: ${r.goodPosture}/${r.reps.length}${r.weight ? `\nWeight: ${r.weight}` : ''}\nTime: ${fmt(r.seconds)}`
     try {
       if (navigator.share) await navigator.share({ title: 'ReMove PK session', text })
       else { await navigator.clipboard.writeText(text); setCopied(true) }

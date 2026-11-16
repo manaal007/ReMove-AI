@@ -13,13 +13,14 @@ import useCamera from '../hooks/useCamera.js'
 import usePoseStream from '../hooks/usePoseStream.js'
 import useVoice from '../hooks/useVoice.js'
 import StatusBanner from '../components/StatusBanner.jsx'
+import WeightQuestion from '../components/WeightQuestion.jsx'
 import { gaugeMax, mean } from '../lib/exercises.js'
 import { STRINGS } from '../lib/i18n.js'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
 export default function Session() {
-  const { lang, patient, ex, side, baseline, setResult, mock } = useApp()
+  const { lang, patient, ex, side, baseline, setResult, mock, weight, setWeight } = useApp()
   const nav = useNavigate()
   const cam = useCamera(true)
   const [playing, setPlaying] = useState(true)
@@ -32,7 +33,7 @@ export default function Session() {
   const max = gaugeMax(ex)
 
   const pose = usePoseStream({
-    videoRef: cam.videoRef, ex, mode: 'session', baseline, lang, patientId: patient?.id,
+    videoRef: cam.videoRef, ex, mode: 'session', baseline, weight, lang, patientId: patient?.id,
     active: playing && !painStop && (cam.status === 'on' || mock),
     onPrompt: (m) => { lastCoach.current = m; voice.speak(m) },
   })
@@ -59,6 +60,7 @@ export default function Session() {
       good: scored.filter((r) => r.label === 'good').length,
       seconds, baseline: baseline?.peak_angle ?? null, target: ex.target_deg,
       sessionId: pose.summary.session_id ?? null, endedReason: pose.summary.ended_reason,
+      weight: pose.summary.weight?.chosen ?? weight ?? null,
     }
     if (mock) {
       try {   // mock mode keeps a local history; with the server it is in SQLite
@@ -112,6 +114,11 @@ export default function Session() {
           <div className="relative min-h-[460px] flex-1 overflow-hidden rounded-[20px] bg-navy lg:min-h-0">
             <ExerciseAvatar kind={ex.kind} side={side} target={ex.target_deg} rest={ex.avatarRest} playing={playing && !painStop} label="Trainer demonstration" />
             <StatusBanner status={pose.status} connected={pose.connected} error={pose.error} />
+            {/* only when calibration was skipped (last baseline): the weight is asked here instead */}
+            {pose.weightAsk && (
+              <WeightQuestion suggested={pose.weightAsk.suggested}
+                onChoose={(c) => { voice.stop(); setWeight(c); pose.chooseWeight(c) }} />
+            )}
             <span className="absolute start-4 top-4 flex items-center gap-2.5 rounded-full bg-teal px-4 py-2.5 text-xl font-extrabold text-navy">
               <Eye /><Bi k="followMe" inline subClassName="text-[17px]" />
             </span>

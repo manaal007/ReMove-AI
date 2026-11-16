@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     good_reps INTEGER,
     avg_peak REAL,
     baseline TEXT,            -- JSON
-    log TEXT                  -- JSON, the full SessionLog
+    log TEXT,                 -- JSON, the full SessionLog
+    weight_suggested TEXT,    -- weight check: none | light | heavy (what the camera saw)
+    weight TEXT               -- the patient's answer (final): none | light | heavy
 );
 """
 
@@ -53,6 +55,10 @@ class Store:
             for col in ("recent_injury", "chest_symptoms"):
                 if col not in cols:
                     self.db.execute(f"ALTER TABLE patients ADD COLUMN {col} INTEGER")
+            cols = {r["name"] for r in self.db.execute("PRAGMA table_info(sessions)")}
+            for col in ("weight_suggested", "weight"):
+                if col not in cols:
+                    self.db.execute(f"ALTER TABLE sessions ADD COLUMN {col} TEXT")
             self.db.commit()
 
     def add_patient(self, p):
@@ -83,18 +89,21 @@ class Store:
         return d
 
     def save_session(self, patient_id, summary, log):
+        weight = summary.get("weight") or {}
         with self.lock, self.db:
             cur = self.db.execute(
                 "INSERT INTO sessions (patient_id, exercise, mode, started_at, ended_at, ended_reason, "
-                "scored_reps, good_reps, avg_peak, baseline, log) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "scored_reps, good_reps, avg_peak, baseline, log, weight_suggested, weight) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (patient_id, summary["exercise"]["id"], summary["mode"], summary["started_at"], summary["ended_at"],
                  summary["ended_reason"], summary["scored_reps"], summary["good_reps"], summary["avg_peak"],
-                 json.dumps(summary["baseline"]), json.dumps(log, ensure_ascii=False)))
+                 json.dumps(summary["baseline"]), json.dumps(log, ensure_ascii=False),
+                 weight.get("suggested"), weight.get("chosen")))
             return cur.lastrowid
 
     def list_sessions(self, patient_id, exercise=None, mode="session", limit=20):
-        q = ("SELECT id, exercise, mode, started_at, ended_at, ended_reason, scored_reps, good_reps, avg_peak "
-             "FROM sessions WHERE patient_id = ? AND mode = ?")
+        q = ("SELECT id, exercise, mode, started_at, ended_at, ended_reason, scored_reps, good_reps, avg_peak, "
+             "weight_suggested, weight FROM sessions WHERE patient_id = ? AND mode = ?")
         args = [patient_id, mode]
         if exercise:
             q += " AND exercise = ?"
