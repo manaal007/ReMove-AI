@@ -18,13 +18,14 @@ JPEG = b"fake-jpeg"
 class FakeDetector:
     """Plays back a queue of landmark dicts, ignoring the JPEG bytes."""
 
-    def __init__(self):
+    def __init__(self, size=(100, 100)):
         self.frames = deque()
         self.closed = False
+        self.size = size
 
     def detect(self, jpeg, t_ms):
         lm = self.frames.popleft() if self.frames else pose(10)
-        return lm, 120.0, 100, 100
+        return lm, 120.0, *self.size
 
     def close(self):
         self.closed = True
@@ -157,6 +158,33 @@ def test_start_errors():
         live.start({"exercise": "E9"})
 
 
+def test_e4_live_session_points_side_and_wording():
+    from tests.synth import SIDE_H, SIDE_W, side_pose
+    det = FakeDetector(size=(SIDE_W, SIDE_H))
+    live = LiveSession(lambda: det, clock=Clock())
+    ready = live.start({"type": "start", "mode": "session", "exercise": "E4", "lang": "en"})
+    info = ready[0]["exercise"]
+    assert info["side"] is None and info["camera_view"] == "side"     # either side
+    assert (info["rest_deg"], info["target_deg"]) == (90, 160)
+    frames = [side_pose("E4", 90, side="left") for _ in range(35)]
+    for _ in range(4):
+        frames += [side_pose("E4", a, side="left") for a in rep_angles(low=90, high=165)]
+    frames += [side_pose("E4", a, side="left") for a in rep_angles(low=90, high=120)]   # short rep
+    out = run(live, det, frames)
+    fr = of_type(out, "frame")
+    assert fr[-1]["status"]["side"] == "left"
+    assert set(fr[-1]["points"]) >= {"hip", "knee", "ankle", "shoulder"}
+    assert fr[-1]["points"]["knee"] == [round(side_pose("E4", 90, side="left")["x25"], 4),
+                                       round(side_pose("E4", 90, side="left")["y25"], 4)]
+    prompts = [p for f in fr for p in f["prompts"]]
+    rr = [p for p in prompts if p["key"] == "reduced_range"]
+    assert rr and rr[0]["en"] == "Straighten your knee a little more."
+    assert rr[0]["audio"] == {"ur": "/audio/ur_straighten_more.mp3", "en": "/audio/en_straighten_more.mp3"}
+    reps = [r for f in fr for r in f["reps"]]
+    assert [r["label"] for r in reps] == ["good"] * 4 + ["reduced_range"]
+    assert 150 < reps[0]["peak"] <= 166
+
+
 def test_store_rejects_empty_name():
     with pytest.raises(ValueError):
         Store(":memory:").add_patient({"name": "  "})
@@ -214,7 +242,7 @@ def test_server_rest_routes():
 
     async def go():
         s, b = await _http(app, "GET", "/api/exercises")
-        assert s == 200 and [e["id"] for e in json.loads(b)] == ["E1", "E2"]
+        assert s == 200 and [e["id"] for e in json.loads(b)] == ["E1", "E2", "E3", "E4"]
         s, b = await _http(app, "POST", "/api/patients", {"name": "Aslam", "age": 58, "side": "right"})
         assert s == 201
         pid = json.loads(b)["id"]

@@ -3,6 +3,9 @@
 export const STRINGS = {
   e1Title: { en: 'Side arm raise', ur: 'بازو پہلو کی طرف اٹھانا' },
   e2Title: { en: 'Forward arm raise', ur: 'بازو آگے کی طرف اٹھانا' },
+  e3Title: { en: 'Elbow bend', ur: 'کہنی موڑنا' },
+  e4Title: { en: 'Knee straighten (sitting)', ur: 'بیٹھ کر گھٹنا سیدھا کرنا' },
+  eitherSide: { en: 'Left or right side', ur: 'بایاں یا دایاں' },
   armMovement: { en: 'Choose a movement', ur: 'حرکت منتخب کریں' },
   rightArmOnly: { en: 'Right arm only for now', ur: 'فی الحال صرف دایاں بازو' },
   comingSoon: { en: 'Coming soon', ur: 'جلد آ رہا ہے' },
@@ -127,6 +130,7 @@ export const STRINGS = {
   stop: { en: 'Stop', ur: 'ختم' },
   liveYou: { en: 'LIVE · YOU', ur: 'لائیو · آپ' },
   elbowAngle: { en: 'Elbow angle', ur: 'کہنی کا زاویہ' },
+  elbowBend: { en: 'Elbow bend', ur: 'کہنی کا موڑ' },
   kneeAngle: { en: 'Knee angle', ur: 'گھٹنے کا زاویہ' },
   toTarget: { en: 'more to target', ur: 'ہدف تک باقی' },
   onTarget: { en: 'Target reached', ur: 'ہدف حاصل' },

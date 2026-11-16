@@ -14,6 +14,12 @@ Phases
   scoring   every rep gets one of the six labels (session.rules)
   done      set finished (max_reps_per_set) or stopped
 
+Side-view exercises (side: auto in config/exercises.yaml, E3/E4) measure one
+side of the body: during the camera check each frame is checked on its
+better-seen side, and when the check passes the side seen best over the passing
+frames is locked for the rest of the session (log.side, status()["side"]).
+Front-view E1 always measures the side given in its config (right).
+
 Tracking loss after the start never goes back to the camera check. Short gaps
 are ignored; after gap_frames_N lost frames the engine pauses silently, and it
 resumes by itself (no "start") as soon as the arm is tracked again. A rep cut
@@ -42,13 +48,14 @@ from typing import Optional
 import numpy as np
 
 from capture.camera_check import check_frame
-from feedback.messages import get_feedback
-from features.signals import FPS, REQUIRED_LM, frame_signals, rep_features
-from session.config import TIMING_MODES
+from feedback.messages import get_feedback, phrase_key
+from features.signals import (ALL_LM, FPS, SIDES, best_side, frame_signals, rep_features,
+                              side_rep_features, side_signals)
+from session.config import TIMING_MODES, is_side_view
 from session.rep_counter import RepCounter
 from session.rules import ABSOLUTE, build_baseline, label_rep, summarize_block
 
-_NAN_ROW = {f"{c}{i}": np.nan for i in REQUIRED_LM for c in "xyv"}
+_NAN_ROW = {f"{c}{i}": np.nan for i in ALL_LM for c in "xyv"}
 
 
 @dataclass
@@ -57,6 +64,7 @@ class Prompt:
     text: str
     audio: str
     reason: str         # "rep" | "block" | "camera" | "session"
+    phrase: str = ""    # phrase key actually spoken (exercise-specific wording, audio file name)
 
 
 @dataclass
@@ -85,6 +93,7 @@ class SessionLog:
     baseline: Optional[dict] = None
     baseline_from_previous: bool = False
     baseline_restarts: int = 0
+    side: Optional[str] = None      # body side measured ("right" for E1; chosen for side-view)
     reps: list = field(default_factory=list)
     prompts: list = field(default_factory=list)   # {"t", "key", "reason"}
 
@@ -103,6 +112,12 @@ class SessionEngine:
         self.priority = cfg["rules"]["priority"]
         self.log = SessionLog(cfg["exercise_id"], language, timing, self.block_size,
                               datetime.now().isoformat(timespec="seconds"))
+        self.ex = cfg["exercise"]
+        self.side_view = is_side_view(self.ex)
+        self.side = None if self.side_view else self.ex.get("side")   # side-view: locked at start
+        self.side_frames = dict.fromkeys(SIDES, 0)   # passing check frames seen best on each side
+        self.phrases = self.ex.get("phrases") or {}
+        self.log.side = self.side
         self.baseline = baseline
         if baseline is not None:
             self.log.baseline, self.log.baseline_from_previous = dict(baseline), True
@@ -125,7 +140,9 @@ class SessionEngine:
         self.last_label = None
 
         self.i = -1
-        self.ts, self.abd, self.elbow, self.lean, self.vis = [], [], [], [], []
+        # angle: primary angle (E1 shoulder abduction, E3 elbow flexion, E4 knee angle)
+        # second: E1 elbow angle (NaN for side-view); comp: E1 trunk lean / compensation angle
+        self.ts, self.angle, self.second, self.comp, self.vis = [], [], [], [], []
 
     # ---------------------------------------------------------------- public
 
@@ -143,7 +160,7 @@ class SessionEngine:
         if self.checking:
             self._camera_check(t, lm, gray, out)
             return out
-        for ev in self.counter.update(self.i, t, self.abd[-1]):
+        for ev in self.counter.update(self.i, t, self.angle[-1]):
             if ev.kind == "lost":
                 if ev.start is not None:
                     self._finish_rep(ev.start, ev.end, {"valid": False}, out, speak=False)
@@ -168,7 +185,7 @@ class SessionEngine:
 
     def status(self):
         """Snapshot for the on-screen overlay."""
-        a = self.abd[-1] if self.abd else np.nan
+        a = self.angle[-1] if self.angle else np.nan
         return {
             "phase": self.phase, "checking": self.checking, "paused": self.paused,
             "issue": self.issue,
@@ -177,31 +194,48 @@ class SessionEngine:
             "baseline_reps": len(self.baseline_feats), "last_label": self.last_label,
             "angle": None if np.isnan(a) else float(a),
             "in_rep": bool(self.counter and self.counter.in_rep),
+            "side": self.side,
         }
 
     # ---------------------------------------------------------------- frames
 
     def _append_signals(self, t, lm):
-        abd, elbow, lean, vis = frame_signals(
-            lm if lm is not None else _NAN_ROW, self.W, self.H, min_vis=self.cfg["visibility"]["min_landmark_visibility"])
+        row = lm if lm is not None else _NAN_ROW
+        min_vis = self.cfg["visibility"]["min_landmark_visibility"]
+        if self.side_view:
+            side = self.side or best_side(row, self.ex["required_landmarks"])
+            angle, comp, vis = side_signals(row, self.W, self.H, self.ex, side, min_vis=min_vis)
+            second = [np.nan]
+        else:
+            angle, second, comp, vis = frame_signals(row, self.W, self.H, min_vis=min_vis)
         self.ts.append(t)
-        self.abd.append(float(abd[0]))
-        self.elbow.append(float(elbow[0]))
-        self.lean.append(float(lean[0]))
+        self.angle.append(float(angle[0]))
+        self.second.append(float(second[0]))
+        self.comp.append(float(comp[0]))
         self.vis.append(float(vis[0]))
 
     def _camera_check(self, t, lm, gray, out):
-        issues = check_frame(lm, gray, self.cfg)
+        frame_side = None
+        if self.side_view and lm is not None:
+            frame_side = best_side(lm, self.ex["required_landmarks"])
+        issues = check_frame(lm, gray, self.cfg, side=frame_side,
+                             aspect=self.W / self.H if self.side_view and self.H else None)
         if issues:
             self.pass_count = 0
+            self.side_frames = dict.fromkeys(SIDES, 0)
             if issues[0] != self.issue:
                 self.issue, self.issue_since = issues[0], t
             self._maybe_say_issue(self.issue, self.issue_since, t, out)
             return
         self.issue = self.issue_since = None
         self.pass_count += 1
+        if frame_side:
+            self.side_frames[frame_side] += 1
         if self.pass_count >= self.cfg["camera_check"]["pass_frames"]:
             self.checking = False
+            if self.side_view:
+                self.side = max(SIDES, key=lambda s: self.side_frames[s])
+                self.log.side = self.side
             self.counter = RepCounter(self.cfg)
             if self.phase == "check":
                 self.phase = "scoring" if self.baseline is not None else "baseline"
@@ -219,9 +253,13 @@ class SessionEngine:
     def _score_rep(self, start, end, out):
         dt = self.ts[end] - self.ts[start]
         fps = (end - start) / dt if dt > 0 else FPS
-        feat = rep_features(np.array(self.abd), np.array(self.elbow), np.array(self.lean),
-                            np.array(self.vis), start, end, fps=fps,
-                            window=self.cfg["tracking"]["smoothing_window"])
+        window = self.cfg["tracking"]["smoothing_window"]
+        if self.side_view:
+            feat = side_rep_features(np.array(self.angle), np.array(self.comp), np.array(self.vis),
+                                     start, end, fps=fps, window=window)
+        else:
+            feat = rep_features(np.array(self.angle), np.array(self.second), np.array(self.comp),
+                                np.array(self.vis), start, end, fps=fps, window=window)
         self._finish_rep(start, end, feat, out, speak=True)
 
     def _finish_rep(self, start, end, feat, out, speak):
@@ -282,8 +320,8 @@ class SessionEngine:
             self.block = []
 
     def _say(self, key, reason, t, out):
-        text, audio = get_feedback(key, self.lang)
-        out.append(Prompt(key, text, str(audio), reason))
+        text, audio = get_feedback(key, self.lang, self.phrases)
+        out.append(Prompt(key, text, str(audio), reason, phrase_key(key, self.phrases)))
         self.log.prompts.append({"t": round(float(t), 3), "key": key, "reason": reason})
 
     def _end(self, reason, out, speak=True):

@@ -19,6 +19,11 @@ framing:
   min_body_height_fraction: 0.25 # head to hips should fill at least this much of frame height
                                  # (REHAB24-6 videos are 0.26-0.32 and track well)
 
+side_view:                       # side-view exercises only (E3, E4)
+  max_shoulder_torso_ratio: 0.6  # shoulder width / torso length above this -> turn_sideways
+                                 # (own recordings: front view 0.64-0.72, side view mostly < 0.4,
+                                 #  one seated side clip up to 0.59; thin margin, recheck with more data)
+
 tracking:
   gap_frames_N: 5                # pause (no camera re-check) if tracking is lost for this many frames
   smoothing_window: 5            # moving average, in frames

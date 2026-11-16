@@ -33,12 +33,14 @@ import time
 import numpy as np
 
 from feedback.messages import LANGS, get_feedback, phrase_key
-from session.config import TIMING_MODES, load_config
+from features.signals import SIDE_LM, best_side
+from session.config import TIMING_MODES, is_side_view, load_config
 from session.engine import SessionEngine
 
-# subject's right side only for now (config/exercises.yaml: side: right)
+# front view (E1): the subject's right arm plus the other shoulder / hip
 POINT_IDS = {"shoulder": 12, "elbow": 14, "wrist": 16, "hip": 24,
              "otherShoulder": 11, "otherHip": 23}
+SIDE_POINTS = ("shoulder", "elbow", "wrist", "hip", "knee", "ankle")
 GOOD_KEYS = ("good", "start", "rest", "set_done")
 MODES = ("calibration", "session")
 
@@ -50,7 +52,8 @@ def exercise_info(exercise_id, cfg=None):
     return {
         "id": exercise_id, "name": ex["name"],
         "label_en": ex["label_en"], "label_ur": ex["label_ur"],
-        "camera_view": ex["camera_view"], "side": ex["side"],
+        # side None = either side: the engine measures whichever the camera sees better
+        "camera_view": ex["camera_view"], "side": None if is_side_view(ex) else ex["side"],
         "rest_deg": lo, "target_deg": hi, "max_safe_deg": ex["max_safe_deg"],
         "max_reps": cfg["caps"]["max_reps_per_set"],
         "ready": bool(ex.get("ready", True)),
@@ -59,9 +62,9 @@ def exercise_info(exercise_id, cfg=None):
 
 
 def prompt_dict(p):
-    en, _ = get_feedback(p.key, "en")
-    ur, _ = get_feedback(p.key, "ur")
-    pk = phrase_key(p.key)
+    pk = p.phrase or phrase_key(p.key)          # exercise-specific wording, if any
+    en, _ = get_feedback(pk, "en")
+    ur, _ = get_feedback(pk, "ur")
     return {
         "key": p.key, "reason": p.reason, "en": en, "ur": ur,
         "audio": {lang: f"/audio/{lang}_{pk}.mp3" for lang in LANGS},
@@ -102,12 +105,18 @@ def _round(v, nd=1):
     return None if v is None or (isinstance(v, float) and np.isnan(v)) else round(float(v), nd)
 
 
-def points(lm, min_vis=0.5):
-    """Named landmark points (normalized 0-1, unmirrored) for the skeleton overlay."""
+def points(lm, min_vis=0.5, ex=None, side=None):
+    """Named landmark points (normalized 0-1, unmirrored) for the skeleton overlay.
+    Side-view exercises: one side's chain (the engine's locked side, else the
+    better-seen side of this frame)."""
     if lm is None:
         return None
+    ids = POINT_IDS
+    if ex is not None and is_side_view(ex):
+        side = side or best_side(lm, ex["required_landmarks"])
+        ids = {name: SIDE_LM[side][name] for name in SIDE_POINTS}
     out = {}
-    for name, i in POINT_IDS.items():
+    for name, i in ids.items():
         v = lm.get(f"v{i}")
         if v is not None and v >= min_vis:
             out[name] = [round(lm[f"x{i}"], 4), round(lm[f"y{i}"], 4)]
@@ -171,10 +180,12 @@ class LiveSession:
         new = self.engine.log.reps[self.n_reps:]
         self.n_reps += len(new)
 
+        status = self.engine.status()
         out = [{
             "type": "frame",
-            "status": self.engine.status(),
-            "points": points(lm, self.cfg["visibility"]["min_landmark_visibility"]),
+            "status": status,
+            "points": points(lm, self.cfg["visibility"]["min_landmark_visibility"],
+                             ex=self.cfg["exercise"], side=status.get("side")),
             "prompts": [prompt_dict(p) for p in prompts],
             "reps": [rep_dict(r) for r in new],
         }]

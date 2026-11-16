@@ -139,9 +139,12 @@ function Leg({ target, playing }) {
 const BODIES = { abduction: Abduction, flexion: Flexion, elbow: Elbow, knee: Leg }
 const DEFAULT_TARGET = { abduction: 90, flexion: 90, elbow: 130, knee: 80 }
 
-// kind: 'abduction' (E1) | 'flexion' (E2) | 'elbow' | 'knee'
-export default function ExerciseAvatar({ kind = 'abduction', side = 'right', target, playing = true, label }) {
+// kind: 'abduction' (E1) | 'flexion' (E2) | 'elbow' (E3) | 'knee' (E4)
+// rest: the joint angle at rest when it is not ~0 (E4 knee: ~90° sitting). The limb swings
+// target - rest degrees; the badge still shows the real target angle.
+export default function ExerciseAvatar({ kind = 'abduction', side = 'right', target, rest = 0, playing = true, label }) {
   const t = target ?? DEFAULT_TARGET[kind]
+  const swing = Math.max(0, t - (rest ?? 0))
   const Body = BODIES[kind] ?? Abduction
   // Drawn for the right side. For the left side we mirror it.
   const mirror = side === 'left' ? 'translate(560 0) scale(-1 1)' : undefined
@@ -152,7 +155,7 @@ export default function ExerciseAvatar({ kind = 'abduction', side = 'right', tar
       <ellipse cx="270" cy="440" rx="170" ry="26" fill="url(#av-floor)" />
       <ellipse cx="270" cy="440" rx="120" ry="14" fill="none" stroke="#14B8A6" strokeOpacity="0.5" strokeWidth="2" />
       <g transform={mirror}>
-        <Body target={t} playing={playing} />
+        <Body target={swing} playing={playing} />
       </g>
       <g>
         <rect x="400" y="40" width="124" height="36" rx="18" fill="#F5B841" />

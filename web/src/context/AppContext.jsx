@@ -12,7 +12,7 @@ function loadLang() {
 export function AppProvider({ children }) {
   const [lang, setLangState] = useState(loadLang)   // 'en' | 'ur'
   const [patient, setPatient] = useState(null)      // health form data (+ id from the server)
-  const [exercise, setExercise] = useState(null)    // exercise id: 'E1' | 'E2' | 'LEG'
+  const [exercise, setExercise] = useState(null)    // exercise id: 'E1' | 'E2' | 'E3' | 'E4'
   const [side, setSide] = useState(null)            // 'left' | 'right'
   const [baseline, setBaseline] = useState(null)    // engine baseline from calibration
   const [result, setResult] = useState(null)        // session summary
@@ -26,7 +26,6 @@ export function AppProvider({ children }) {
       .then((list) => {
         const merged = {}
         for (const e of list) merged[e.id] = { ...(EXERCISES[e.id] ?? { group: 'arm', kind: 'abduction', joint: 'shoulder', angleKey: 'shoulderAngle', title: null }), ...e }
-        merged.LEG = EXERCISES.LEG   // shown as "coming soon" until the engine supports it
         setExercises(merged)
         setServerOk(true)
       })
@@ -54,7 +53,7 @@ export function AppProvider({ children }) {
       t2: (key) => STRINGS[key]?.[other] ?? '',
       mock: MOCK, serverOk,
       exercises, ex,
-      // usable now? (LEG needs mock mode until the Python engine supports it)
+      // usable now? (exercises marked ready: false in config show "coming soon")
       available: (e) => MOCK || (!e.mockOnly && e.ready !== false),
       patient, setPatient, exercise, setExercise, side, setSide,
       baseline, setBaseline, result, setResult,

@@ -9,9 +9,18 @@ Issues, in the order they are reported (only the first one is spoken):
   too_dark / too_bright  - mean gray level outside brightness limits
   not_tracked            - no pose found at all
   step_back              - a required landmark is cut off or poorly seen
+  turn_sideways          - side-view exercises only: the person faces the camera
+                           (shoulder width / torso length above side_view.max_shoulder_torso_ratio)
   come_closer            - person too small: head-to-hips below min_body_height_fraction
+
+Front-view exercises (E1) check visibility.required_landmarks. Side-view
+exercises (side: auto, E3/E4) check the exercise's required_landmarks on one
+side: the side passed in, or else whichever side is better seen in this frame.
 """
 import numpy as np
+
+from features.signals import SIDE_LM, best_side
+from session.config import is_side_view
 
 LANDMARK_IDS = {
     "nose": 0,
@@ -19,8 +28,10 @@ LANDMARK_IDS = {
     "left_elbow": 13, "right_elbow": 14,
     "left_wrist": 15, "right_wrist": 16,
     "left_hip": 23, "right_hip": 24,
+    "left_knee": 25, "right_knee": 26,
+    "left_ankle": 27, "right_ankle": 28,
 }
-NOSE, L_HIP, R_HIP = 0, 23, 24
+NOSE, L_SH, R_SH, L_HIP, R_HIP = 0, 11, 12, 23, 24
 
 
 def mean_gray(frame_bgr):
@@ -39,11 +50,37 @@ def _visible(lm, i, min_vis):
     return v is not None and not np.isnan(v) and v >= min_vis and _in_frame(lm, i)
 
 
-def check_frame(lm, gray, cfg):
+def required_ids(cfg, side=None, lm=None):
+    """Landmark ids that must be visible. Side-view: the chosen side's joints."""
+    ex = cfg["exercise"]
+    if not is_side_view(ex):
+        return [LANDMARK_IDS[n] for n in cfg["visibility"]["required_landmarks"]]
+    side = side or best_side(lm, ex["required_landmarks"])
+    return [SIDE_LM[side][j] for j in ex["required_landmarks"]]
+
+
+def shoulder_torso_ratio(lm, aspect):
+    """Shoulder width / torso length in pixels (aspect = frame width / height).
+    About 0.65-0.75 facing the camera, below about 0.4 side-on. None if unknown."""
+    try:
+        sx = (lm[f"x{L_SH}"] - lm[f"x{R_SH}"]) * aspect
+        sy = lm[f"y{L_SH}"] - lm[f"y{R_SH}"]
+        tx = ((lm[f"x{L_SH}"] + lm[f"x{R_SH}"]) - (lm[f"x{L_HIP}"] + lm[f"x{R_HIP}"])) / 2 * aspect
+        ty = ((lm[f"y{L_SH}"] + lm[f"y{R_SH}"]) - (lm[f"y{L_HIP}"] + lm[f"y{R_HIP}"])) / 2
+    except (KeyError, TypeError):
+        return None
+    torso = float(np.hypot(tx, ty))
+    r = float(np.hypot(sx, sy)) / torso if torso > 0 else np.nan
+    return None if np.isnan(r) else r
+
+
+def check_frame(lm, gray, cfg, side=None, aspect=None):
     """
-    lm   : dict of one frame's landmarks {"x12": .., "y12": .., "v12": ..}, or None if no pose
-    gray : mean gray level of the frame (see mean_gray)
-    cfg  : merged config from session.config.load_config
+    lm     : dict of one frame's landmarks {"x12": .., "y12": .., "v12": ..}, or None if no pose
+    gray   : mean gray level of the frame (see mean_gray)
+    cfg    : merged config from session.config.load_config
+    side   : side-view exercises: 'left' / 'right', or None = better-seen side of this frame
+    aspect : frame width / height, for the side-on check (skipped if None)
     Returns a list of issue codes; empty list = frame is OK.
     """
     issues = []
@@ -58,10 +95,16 @@ def check_frame(lm, gray, cfg):
         return issues
 
     min_vis = cfg["visibility"]["min_landmark_visibility"]
-    required = [LANDMARK_IDS[n] for n in cfg["visibility"]["required_landmarks"]]
+    required = required_ids(cfg, side, lm)
     if not all(_visible(lm, i, min_vis) for i in required):
         issues.append("step_back")
         return issues
+
+    if is_side_view(cfg["exercise"]) and aspect:
+        r = shoulder_torso_ratio(lm, aspect)
+        if r is not None and r > cfg["side_view"]["max_shoulder_torso_ratio"]:
+            issues.append("turn_sideways")
+            return issues
 
     # head-to-hips height as a share of frame height (needs the nose too)
     if _visible(lm, NOSE, min_vis):

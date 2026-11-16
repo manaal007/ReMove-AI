@@ -9,6 +9,7 @@ const ISSUE = {
   not_tracked: { en: 'Stand in front of the camera', ur: 'کیمرے کے سامنے کھڑے ہوں' },
   step_back: { en: 'Step back a little', ur: 'تھوڑا پیچھے ہٹیں' },
   come_closer: { en: 'Come a little closer', ur: 'تھوڑا قریب آئیں' },
+  turn_sideways: { en: 'Turn sideways to the camera', ur: 'کیمرے کی طرف پہلو کریں' },
 }
 
 export default function StatusBanner({ status, connected, error }) {

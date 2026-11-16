@@ -41,9 +41,12 @@ async def make(lang, name, text):
     for attempt in range(3):
         try:
             await edge_tts.Communicate(text, VOICES[lang]).save(str(out))
+            if out.stat().st_size == 0:
+                raise RuntimeError("empty audio file")
             print("done", out.name)
             return True
         except Exception as e:
+            out.unlink(missing_ok=True)      # never leave a partial file: reruns skip existing files
             print("retry", out.name, attempt + 1, repr(text), e)
             await asyncio.sleep(3)
     print("FAILED", out.name)
@@ -69,6 +72,8 @@ async def main(langs, force, only=None):
 
 
 if __name__ == "__main__":
+    # Windows consoles default to cp1252, which cannot print Urdu (crashed the retry message)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("--lang", choices=LANGS, help="only this language")
     ap.add_argument("--force", action="store_true", help="remake files that already exist")

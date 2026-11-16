@@ -37,8 +37,22 @@ def test_label_audio_mapping():
 
 
 def test_no_orphan_phrases():
+    """Every phrase is reachable: through a label / prompt, or an exercise's own `phrases:` map."""
+    import yaml
+    from session.config import CONFIG_DIR
+    with open(CONFIG_DIR / "exercises.yaml", encoding="utf-8") as f:
+        exercises = yaml.safe_load(f)
     used = {M.phrase_key(k) for k in ALL_KEYS}
+    for ex in exercises.values():
+        used |= set((ex.get("phrases") or {}).values())
     assert used == set(M.PHRASES)
+
+
+@pytest.mark.parametrize("key", list(M.PHRASES))
+@pytest.mark.parametrize("lang", M.LANGS)
+def test_every_phrase_has_an_audio_file(key, lang):
+    """scripts/make_audio.py makes these; a missing file means it was not run after a new phrase."""
+    assert (M.AUDIO_DIR / f"{lang}_{key}.mp3").exists()
 
 
 def test_good_asks_for_the_next_rep():

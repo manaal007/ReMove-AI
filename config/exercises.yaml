@@ -1,4 +1,7 @@
-# Exercises for ReMove PK (right arm only)
+# Exercises for ReMove PK
+# E1 (front view) measures the right arm only.
+# E3 / E4 (side view, side: auto) use whichever body side the camera sees better;
+# it is chosen during the camera check and then kept for the whole session.
 # Angle ranges are STARTING VALUES. Confirm with the physiotherapy advisor.
 # Angles are in degrees, measured from unmirrored video.
 
@@ -30,3 +33,55 @@ E2:
   min_elbow_extension_deg: 150
   max_trunk_lean_deg: 10
   max_speed_deg_per_s: 60
+
+# ---------------------------------------------------------------- side view (E3, E4)
+# primary_angle always RISES during the effort phase (see features/signals.py),
+# so rep detection and the six-label rules are the same as E1.
+# required_landmarks: joints of the chosen side that must be seen (camera check + tracking).
+# compensation: change of this angle from the rep start above max_change_deg -> trunk_compensation
+# phrases: rep label / prompt -> phrase key in feedback/messages.py, where E1's wording does not fit.
+# overrides: values that replace thresholds.yaml for this exercise only.
+
+E3:
+  name: elbow_curl
+  label_en: "Bend your elbow, then straighten it"
+  label_ur: "کہنی موڑیں، پھر سیدھی کریں"
+  camera_view: side
+  side: auto
+  joints: [shoulder, elbow, wrist]
+  primary_angle: elbow_flexion        # 180 - (shoulder - elbow - wrist): 0 = straight, rises as the elbow bends
+  required_landmarks: [shoulder, elbow, wrist, hip]
+  target_range_deg: [10, 120]         # volunteers (healthy) reached 120-165
+  max_safe_deg: 145                   # normal adult elbow flexion is about 145-150
+  compensation:
+    signal: shoulder_angle            # hip - shoulder - elbow: upper arm swinging forward / back
+    max_change_deg: 20
+  phrases:
+    reduced_range: bend_more
+    too_fast: too_fast_elbow
+    trunk_compensation: upper_arm_still
+
+E4:
+  name: knee_extension
+  label_en: "Sit, straighten your knee, then bend it"
+  label_ur: "بیٹھ کر گھٹنا سیدھا کریں، پھر موڑیں"
+  camera_view: side
+  side: auto
+  joints: [hip, knee, ankle]
+  primary_angle: knee_angle           # hip - knee - ankle: ~90 sitting, 180 = straight leg
+  required_landmarks: [shoulder, hip, knee, ankle]   # shoulder: for the trunk angle
+  target_range_deg: [90, 160]         # volunteers (healthy) rested at 85-96 and reached 150-175
+  max_safe_deg: 180                   # a straight knee; never ask for more
+  compensation:
+    signal: trunk_angle               # shoulder-over-hip line vs vertical: leaning back (or forward)
+    max_change_deg: 15
+  phrases:
+    reduced_range: straighten_more
+    too_fast: too_fast_knee
+    jerky: jerky_leg
+    trunk_compensation: sit_straight
+    not_tracked: not_tracked_leg
+    step_back: move_chair_back        # also when the shoulder / hip is cut off at the side
+  overrides:
+    framing:
+      min_body_height_fraction: 0.2   # seated: head-to-hips is 0.24-0.36 of a portrait frame

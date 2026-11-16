@@ -20,7 +20,7 @@ export default function ExerciseChoice() {
   const { patient, exercises, available, setExercise, setSide, resetSession, lang, other, serverOk, mock } = useApp()
   const nav = useNavigate()
   const arms = Object.values(exercises).filter((e) => e.group === 'arm')
-  const leg = exercises.LEG
+  const leg = Object.values(exercises).find((e) => e.group === 'leg')   // E4 seated knee extension
   const [armId, setArmId] = useState(arms[0]?.id ?? 'E1')
   const arm = exercises[armId] ?? arms[0]
 
@@ -50,7 +50,7 @@ export default function ExerciseChoice() {
           {arm && (
             <Card className="flex flex-col overflow-hidden shadow-[0_8px_30px_rgba(11,31,58,0.08)]">
               <div className="relative h-[230px] bg-navy">
-                <ExerciseAvatar kind={arm.kind} target={arm.target_deg} label={arm.label_en} />
+                <ExerciseAvatar kind={arm.kind} target={arm.target_deg} rest={arm.avatarRest} label={arm.label_en} />
                 <span className="absolute start-[18px] top-[18px] rounded-full bg-white px-3.5 py-1.5 font-en text-[15px] font-bold text-navy">ARM · {arm.id}</span>
               </div>
               <div className="flex flex-col gap-3.5 px-7 py-5">
@@ -67,7 +67,7 @@ export default function ExerciseChoice() {
                 <div className="flex flex-wrap gap-2.5">
                   <Chip><Clock /><Txt k="about5" /></Chip>
                   <Chip><Reps /><span className="font-en">{arm.max_reps}</span>&nbsp;<Txt k="repetition" /></Chip>
-                  {arm.side && <Chip tone="adjust"><Txt k="rightArmOnly" /></Chip>}
+                  {arm.side ? <Chip tone="adjust"><Txt k="rightArmOnly" /></Chip> : <Chip><Txt k="eitherSide" /></Chip>}
                 </div>
                 {wrongSide && (
                   <p role="alert" className="m-0 rounded-xl bg-amber-100 px-4 py-3 text-[17px] font-medium text-amber-900"><Txt k="sideNotYet" /></p>
@@ -82,12 +82,12 @@ export default function ExerciseChoice() {
             </Card>
           )}
 
-          {/* LEG: mock mode only until the engine supports knee exercises */}
+          {/* LEG: E4 seated knee extension */}
           {leg && (
             <Card className="flex flex-col overflow-hidden shadow-[0_8px_30px_rgba(11,31,58,0.08)]">
               <div className="relative h-[230px] bg-navy">
-                <ExerciseAvatar kind="knee" target={leg.target_deg} label="Sit and straighten the knee" playing={available(leg)} />
-                <span className="absolute start-[18px] top-[18px] rounded-full bg-white px-3.5 py-1.5 font-en text-[15px] font-bold text-navy">LEG</span>
+                <ExerciseAvatar kind={leg.kind} target={leg.target_deg} rest={leg.avatarRest} label={leg.label_en} playing={available(leg)} />
+                <span className="absolute start-[18px] top-[18px] rounded-full bg-white px-3.5 py-1.5 font-en text-[15px] font-bold text-navy">LEG · {leg.id}</span>
                 {!available(leg) && <span className="absolute end-[18px] top-[18px] rounded-full bg-gold px-3.5 py-1.5 text-[15px] font-bold text-navy"><Txt k="comingSoon" /></span>}
               </div>
               <div className="flex flex-col gap-3.5 px-7 py-5">

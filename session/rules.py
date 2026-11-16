@@ -2,7 +2,9 @@
 Six-label rules for v1 (no ML).
 
   not_tracked         rep features invalid (too many missing frames) or tracking lost mid-rep
-  trunk_compensation  trunk_lean_max > exercise max_trunk_lean_deg
+  trunk_compensation  E1: trunk_lean_max > exercise max_trunk_lean_deg (sideways lean)
+                      side-view exercises (E3, E4): comp_change_max > compensation.max_change_deg
+                      (E3 upper arm swinging: shoulder angle; E4 leaning back: trunk angle)
   too_fast            duration_s < too_fast_frac   * baseline duration_s
   jerky               sparc      < jerky_sparc_ratio * baseline sparc
                       (SPARC is negative, so this means "ratio times less smooth";
@@ -59,6 +61,13 @@ def _is_jerky(feat, baseline, ratio):
     return s < ratio * b
 
 
+def _is_compensating(feat, ex):
+    comp = ex.get("compensation")
+    if comp:
+        return feat["comp_change_max"] > comp["max_change_deg"]
+    return feat["trunk_lean_max"] > ex["max_trunk_lean_deg"]
+
+
 def find_faults(feat, cfg, baseline=None):
     """All faults that fire for this rep, in cfg priority order (empty = good)."""
     rules, ex = cfg["rules"], cfg["exercise"]
@@ -66,7 +75,7 @@ def find_faults(feat, cfg, baseline=None):
     if not feat.get("valid", False):
         fired.add("not_tracked")
     else:
-        if feat["trunk_lean_max"] > ex["max_trunk_lean_deg"]:
+        if _is_compensating(feat, ex):
             fired.add("trunk_compensation")
         if baseline is not None:
             if feat["duration_s"] < rules["too_fast_frac"] * baseline["duration_s"]:

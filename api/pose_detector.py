@@ -12,10 +12,11 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 
 from capture.camera_check import mean_gray
+from features.signals import ALL_LM
 from pose.extract_landmarks import MODEL_PATH
 
 ROOT = Path(__file__).resolve().parent.parent
-LM_IDS = (0, 11, 12, 13, 14, 15, 16, 23, 24)   # what the engine and camera check use
+LM_IDS = tuple(ALL_LM)   # what the engine and camera check use: nose, arms, hips, knees, ankles
 
 
 class PoseDetector:

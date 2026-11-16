@@ -1,5 +1,5 @@
 """
-Run one E1 session in an OpenCV window (webcam or a video file).
+Run one session in an OpenCV window (webcam or a video file). Default exercise E1.
 
 Run from inside remove-pk, with .venv active:
     python session/run_session.py                          # webcam 0, Urdu, timing from config
@@ -26,14 +26,14 @@ sys.path.insert(0, os.getcwd())
 from capture.camera_check import mean_gray  # noqa: E402
 from feedback.audio_player import AudioPlayer  # noqa: E402
 from feedback.messages import LANGS  # noqa: E402
-from features.signals import L_HIP, L_SH, R_EL, R_HIP, R_SH, R_WR  # noqa: E402
+from features.signals import ALL_LM, L_HIP, L_SH, R_EL, R_HIP, R_SH, R_WR  # noqa: E402
 from pose.extract_landmarks import MODEL_PATH, ensure_model  # noqa: E402
 from session.config import TIMING_MODES, load_config  # noqa: E402
 from session.engine import SessionEngine  # noqa: E402
 from session.rules import reference_rom  # noqa: E402
 
 WIN = "ReMove PK"
-LM_IDS = (0, L_SH, R_SH, 13, R_EL, 15, R_WR, L_HIP, R_HIP)   # what the engine + check need
+LM_IDS = tuple(ALL_LM)   # what the engine + check need (E3/E4 also use knees, ankles)
 BONES = [(R_SH, R_EL), (R_EL, R_WR), (L_SH, R_SH), (L_HIP, R_HIP), (R_SH, R_HIP), (L_SH, L_HIP)]
 GREEN, ORANGE, RED, WHITE, GREY = (80, 200, 80), (0, 160, 255), (60, 60, 230), (255, 255, 255), (160, 160, 160)
 END_LINGER_S = 4.0   # keep the window open this long after the set ends, so set_done is heard
@@ -123,7 +123,11 @@ def print_summary(log, cfg):
                   f"= {rules['jerky_sparc_ratio'] * b['sparc']:.2f}   (i.e. 'smooth x' column > {rules['jerky_sparc_ratio']})")
         else:
             print("  jerky          off (baseline has no SPARC value)")
-        print(f"  trunk          lean > {ex['max_trunk_lean_deg']} deg")
+        if ex.get("compensation"):
+            c = ex["compensation"]
+            print(f"  compensation   {c['signal']} change > {c['max_change_deg']} deg   (side measured: {log.side})")
+        else:
+            print(f"  trunk          lean > {ex['max_trunk_lean_deg']} deg")
     else:
         print("\nNo baseline was set, so only not_tracked / trunk_compensation could fire.")
 
@@ -136,7 +140,7 @@ def print_summary(log, cfg):
               f"{_num(f.get('duration_s'), '6.2f')} {_ratio(f.get('duration_s'), dur_b):>6} "
               f"{_num(f.get('rom'), '6.1f')} {_ratio(f.get('rom'), rom_b):>6} "
               f"{_num(f.get('peak_angle'), '6.1f')} {_ratio(f.get('sparc'), sparc_b):>8} "
-              f"{_num(f.get('trunk_lean_max'), '5.1f')}  {r['faults']}")
+              f"{_num(f.get('trunk_lean_max', f.get('comp_change_max')), '5.1f')}  {r['faults']}")
     print("  (baseline-phase reps are not scored against the baseline; their ratios are for reference)")
 
 

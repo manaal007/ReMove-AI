@@ -110,7 +110,7 @@ export default function Session() {
         {/* CENTER 40%: trainer avatar + rep counter */}
         <section aria-label="Trainer demonstration" className="flex min-w-0 flex-[4_1_440px] flex-col gap-4 lg:min-h-0">
           <div className="relative min-h-[460px] flex-1 overflow-hidden rounded-[20px] bg-navy lg:min-h-0">
-            <ExerciseAvatar kind={ex.kind} side={side} target={ex.target_deg} playing={playing && !painStop} label="Trainer demonstration" />
+            <ExerciseAvatar kind={ex.kind} side={side} target={ex.target_deg} rest={ex.avatarRest} playing={playing && !painStop} label="Trainer demonstration" />
             <StatusBanner status={pose.status} connected={pose.connected} error={pose.error} />
             <span className="absolute start-4 top-4 flex items-center gap-2.5 rounded-full bg-teal px-4 py-2.5 text-xl font-extrabold text-navy">
               <Eye /><Bi k="followMe" inline subClassName="text-[17px]" />

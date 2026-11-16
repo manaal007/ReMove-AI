@@ -60,7 +60,7 @@ export default function Calibration() {
 
         <div className="flex min-h-0 flex-1 flex-wrap gap-6">
           <div className="relative min-h-[400px] min-w-0 flex-[1_1_480px] overflow-hidden rounded-[20px] bg-navy">
-            <ExerciseAvatar kind={ex.kind} side={side} target={ex.target_deg} playing={!finished} label="Trainer demonstration" />
+            <ExerciseAvatar kind={ex.kind} side={side} target={ex.target_deg} rest={ex.avatarRest} playing={!finished} label="Trainer demonstration" />
             <span className="absolute start-4 top-4 flex items-center gap-2.5 rounded-full bg-teal px-4 py-2.5 text-xl font-extrabold text-navy">
               <Eye /><Txt k="followMe" />
             </span>

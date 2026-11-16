@@ -194,8 +194,13 @@ function mockPoints(kind, angle, lean) {
   const rad = (d) => (d * Math.PI) / 180
   const dx = lean ? 0.04 : 0
   if (kind === 'knee') {
-    const hip = [0.42, 0.55], knee = [0.62, 0.56], a = rad(90 - angle)
+    // E4 angle is hip-knee-ankle: 90 = shin hanging down, 180 = leg straight out
+    const hip = [0.42, 0.55], knee = [0.62, 0.56], a = rad(180 - angle)
     return { hip, knee, ankle: [knee[0] + 0.24 * Math.cos(a), knee[1] + 0.24 * Math.sin(a)], shoulder: [0.4 + dx, 0.22], otherHip: [0.4, 0.55] }
+  }
+  if (kind === 'elbow') {   // side view: upper arm hangs still, forearm swings forward by the bend angle
+    const shoulder = [0.48 + dx, 0.3], elbow = [0.48, 0.48], a = rad(angle)
+    return { shoulder, elbow, wrist: [elbow[0] + 0.16 * Math.sin(a), elbow[1] + 0.16 * Math.cos(a)], hip: [0.47, 0.62] }
   }
   const shoulder = [0.42 + dx, 0.32]
   const a = rad(angle)

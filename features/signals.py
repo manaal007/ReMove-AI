@@ -22,7 +22,16 @@ _trapz = getattr(np, "trapezoid", None) or np.trapz
 
 # MediaPipe landmark ids (subject's own left/right)
 L_SH, R_SH, R_EL, R_WR, L_HIP, R_HIP = 11, 12, 14, 16, 23, 24
+L_EL, L_WR, L_KNEE, R_KNEE, L_ANK, R_ANK = 13, 15, 25, 26, 27, 28
 REQUIRED_LM = [R_SH, R_EL, R_WR, R_HIP, L_SH, L_HIP]
+
+# Side-view exercises (E3, E4) use one side of the body: whichever is more visible.
+SIDE_LM = {
+    "left": {"shoulder": L_SH, "elbow": L_EL, "wrist": L_WR, "hip": L_HIP, "knee": L_KNEE, "ankle": L_ANK},
+    "right": {"shoulder": R_SH, "elbow": R_EL, "wrist": R_WR, "hip": R_HIP, "knee": R_KNEE, "ankle": R_ANK},
+}
+SIDES = ("left", "right")
+ALL_LM = sorted({0, L_SH, R_SH, L_HIP, R_HIP} | {i for s in SIDE_LM.values() for i in s.values()})
 
 FEATURE_NAMES = ["duration_s", "peak_angle", "rom", "peak_speed", "mean_speed",
                  "jerk_norm", "elbow_min", "elbow_mean", "trunk_lean_max", "trunk_lean_range"]
@@ -65,6 +74,74 @@ def frame_signals(lm, W, H, min_vis=MIN_VIS):
     for s in (abd, elbow, lean):
         s[bad] = np.nan
     return abd, elbow, lean, vis
+
+
+# ---------------------------------------------------------------- side view (E3, E4)
+#
+# Primary angles all RISE during the effort phase of a rep, so the rep counter,
+# baseline and rules work unchanged ("rest -> rise -> back to rest"):
+#   elbow_flexion  180 - (shoulder-elbow-wrist): 0 = straight arm, ~140 = fully bent
+#   knee_angle     hip-knee-ankle: ~90 sitting, 180 = straight leg
+# Compensation signals are watched for change during the rep (not absolute value):
+#   shoulder_angle hip-shoulder-elbow: changes when the upper arm swings forward/back
+#   trunk_angle    shoulder-above-hip line vs vertical: changes when leaning back/forward
+
+
+def _lm_col(lm, name):
+    v = lm[name] if name in lm else np.nan
+    return np.asarray(v.values if hasattr(v, "values") else [v], dtype=float)
+
+
+def _side_point(lm, side, joint, W, H):
+    i = SIDE_LM[side][joint]
+    return np.c_[_lm_col(lm, f"x{i}") * W, _lm_col(lm, f"y{i}") * H]
+
+
+def side_visibility(lm, side, joints):
+    """Lowest visibility of these joints on one side (NaN counts as 0), per frame."""
+    V = np.vstack([_lm_col(lm, f"v{SIDE_LM[side][j]}") for j in joints])
+    return np.nan_to_num(V, nan=0.0).min(axis=0)
+
+
+def best_side(lm, joints):
+    """'left' or 'right': the side whose joints are better seen (mean visibility).
+    lm is one frame (dict) or many (DataFrame: mean over all frames)."""
+    def score(side):
+        V = np.vstack([_lm_col(lm, f"v{SIDE_LM[side][j]}") for j in joints])
+        return float(np.nan_to_num(V, nan=0.0).mean())
+    return "left" if score("left") > score("right") else "right"
+
+
+def _primary(name, P):
+    if name == "elbow_flexion":
+        return 180.0 - angle_at(P("elbow"), P("shoulder"), P("wrist"))
+    if name == "knee_angle":
+        return angle_at(P("knee"), P("hip"), P("ankle"))
+    raise KeyError(f"unknown primary_angle {name!r}")
+
+
+def _compensation(name, P):
+    if name == "shoulder_angle":
+        return angle_at(P("shoulder"), P("hip"), P("elbow"))
+    if name == "trunk_angle":
+        trunk = P("shoulder") - P("hip")
+        return np.degrees(np.arctan2(trunk[:, 0], -trunk[:, 1]))   # 0 = upright
+    raise KeyError(f"unknown compensation signal {name!r}")
+
+
+def side_signals(lm, W, H, ex, side, min_vis=MIN_VIS):
+    """Per-frame primary angle, compensation angle and the lowest visibility of the
+    exercise's required joints, for one side-view exercise (config/exercises.yaml
+    entry `ex`) on one body side. Frames where any required joint is below
+    min_vis get NaN angles. lm: DataFrame or a single-frame dict, like frame_signals."""
+    P = lambda j: _side_point(lm, side, j, W, H)  # noqa: E731
+    primary = _primary(ex["primary_angle"], P)
+    comp = _compensation(ex["compensation"]["signal"], P)
+    vis = side_visibility(lm, side, ex["required_landmarks"])
+    bad = ~(vis >= min_vis)
+    primary[bad] = np.nan
+    comp[bad] = np.nan
+    return primary, comp, vis
 
 
 def smooth(x, window=SMOOTH):
@@ -121,13 +198,53 @@ def rep_features(abd, elbow, lean, vis, f0, f1, fps=FPS, window=SMOOTH):
         out["valid"] = False
         return out
     a, e, l = smooth(a, window), smooth(e, window), smooth(l, window)
+    out.update(_motion_features(a, fps))
+    out.update({
+        "elbow_min": e.min(),
+        "elbow_mean": e.mean(),
+        # trunk lean relative to the lean at the start of the rep (removes camera tilt)
+        "trunk_lean_max": _change_from_start(l),
+        "trunk_lean_range": l.max() - l.min(),
+    })
+    return out
+
+
+def side_rep_features(primary, comp, vis, f0, f1, fps=FPS, window=SMOOTH):
+    """Features for one side-view rep (E3, E4) spanning frames f0..f1 (inclusive).
+    Same motion features as rep_features, plus the compensation change:
+      comp_change_max  largest change of the compensation angle from the rep start
+      comp_range       max - min of the compensation angle over the rep"""
+    sl = slice(int(f0), int(f1) + 1)
+    a, c, v = primary[sl], comp[sl], vis[sl]
+    nan_frac = float(np.mean(np.isnan(a))) if len(a) else 1.0
+    out = {"n_frames": len(a), "nan_frac": nan_frac,
+           "vis_mean": float(np.nanmean(v)) if len(v) and not np.all(np.isnan(v)) else np.nan}
+    if len(a) < MIN_REP_FRAMES or nan_frac > MAX_NAN_FRAC:
+        out["valid"] = False
+        return out
+    a, c = smooth(a, window), smooth(c, window)
+    out.update(_motion_features(a, fps))
+    out.update({
+        "comp_change_max": _change_from_start(c),
+        "comp_range": c.max() - c.min(),
+    })
+    return out
+
+
+def _change_from_start(x, n_start=5):
+    """Largest absolute change from the mean of the first n_start frames."""
+    return np.abs(x - x[:n_start].mean()).max()
+
+
+def _motion_features(a, fps):
+    """Duration, range, speed and smoothness of one smoothed primary-angle rep."""
     dt = 1 / fps
     vel = np.gradient(a, dt)
     acc = np.gradient(vel, dt)
     jerk = np.gradient(acc, dt)
     dur = len(a) * dt
     rom = a.max() - a.min()
-    out.update({
+    return {
         "valid": True,
         "duration_s": dur,
         "peak_angle": a.max(),
@@ -140,10 +257,4 @@ def rep_features(abd, elbow, lean, vis, f0, f1, fps=FPS, window=SMOOTH):
         "jerk_norm": (_trapz(jerk ** 2, dx=dt) * dur ** 5) / (rom ** 2 + 1e-9),
         # smoothness used by the jerky rule (negative; more negative = less smooth)
         "sparc": phase_sparc(a, fps),
-        "elbow_min": e.min(),
-        "elbow_mean": e.mean(),
-        # trunk lean relative to the lean at the start of the rep (removes camera tilt)
-        "trunk_lean_max": np.abs(l - l[:5].mean()).max(),
-        "trunk_lean_range": l.max() - l.min(),
-    })
-    return out
+    }
