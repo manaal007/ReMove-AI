@@ -24,7 +24,7 @@ export default function Calibration() {
   const [lastBaseline, setLastBaseline] = useState(null)
 
   const pose = usePoseStream({
-    videoRef: cam.videoRef, ex, mode: 'calibration', weight, lang, patientId: patient?.id,
+    videoRef: cam.videoRef, ex, mode: 'calibration', weight, side, lang, patientId: patient?.id,
     active: cam.status === 'on' || mock, onPrompt: voice.speak,
   })
 

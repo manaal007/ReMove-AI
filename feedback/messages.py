@@ -25,8 +25,11 @@ LANGS = ("ur", "en")
 REP_LABELS = ("good", "reduced_range", "too_fast", "jerky",
               "trunk_compensation", "not_tracked")
 PROMPTS = ("step_back", "come_closer", "too_dark", "too_bright", "start", "rest", "set_done",
-           "adjust_position", "turn_sideways",
-           "weight_ask_none", "weight_ask_light", "weight_ask_heavy")
+           "adjust_position", "turn_sideways", "show_left_side", "show_right_side",
+           "weight_ask_none", "weight_ask_light", "weight_ask_heavy",
+           # weight guidance after the set (session/weight_advice.py)
+           "weight_up_light", "weight_up_heavy", "weight_down_light", "weight_down_none",
+           "weight_stay", "weight_at_max", "talk_to_physio")
 
 # rep label -> phrase key (labels not listed use their own name)
 LABEL_TO_PHRASE = {
@@ -103,6 +106,14 @@ PHRASES = {
         "en": "Turn sideways, so the side you are exercising faces the camera.",
         "ur": "پہلو کے بل مڑیں، تاکہ ورزش والی سائیڈ کیمرے کی طرف ہو",
     },
+    "show_left_side": {
+        "en": "Please turn so your left side faces the camera.",
+        "ur": "براہ کرم مڑیں تاکہ آپ کا بایاں پہلو کیمرے کی طرف ہو",
+    },
+    "show_right_side": {
+        "en": "Please turn so your right side faces the camera.",
+        "ur": "براہ کرم مڑیں تاکہ آپ کا دایاں پہلو کیمرے کی طرف ہو",
+    },
     "move_chair_back": {
         "en": "Move the chair or the camera back, so your whole body and leg are visible.",
         "ur": "کرسی یا کیمرہ تھوڑا پیچھے کریں، تاکہ پورا جسم اور ٹانگ نظر آئے",
@@ -131,6 +142,35 @@ PHRASES = {
     "weight_ask_heavy": {
         "en": "We see: a heavy weight. Is that right?",
         "ur": "ہمیں لگتا ہے: بھاری وزن۔ کیا یہ درست ہے؟",
+    },
+    # --- weight guidance after the set, for the next session (TO CONFIRM WITH PHYSIO) ---
+    "weight_up_light": {
+        "en": "Well done! Next session, try a light weight.",
+        "ur": "شاباش! اگلی بار ہلکا وزن استعمال کر کے دیکھیں",
+    },
+    "weight_up_heavy": {
+        "en": "Well done! Next session, try a heavier weight.",
+        "ur": "شاباش! اگلی بار تھوڑا بھاری وزن استعمال کر کے دیکھیں",
+    },
+    "weight_down_light": {
+        "en": "Next session, use a lighter weight.",
+        "ur": "اگلی بار ہلکا وزن استعمال کریں",
+    },
+    "weight_down_none": {
+        "en": "Next session, do the exercise without a weight.",
+        "ur": "اگلی بار یہ ورزش بغیر وزن کے کریں",
+    },
+    "weight_stay": {
+        "en": "Keep the same weight next session.",
+        "ur": "اگلی بار بھی یہی وزن رکھیں",
+    },
+    "weight_at_max": {
+        "en": "Very good. Keep this weight: it is the most your physiotherapist allows.",
+        "ur": "بہت اچھے۔ یہی وزن رکھیں، یہ آپ کے فزیوتھراپسٹ کی اجازت کے مطابق سب سے زیادہ ہے",
+    },
+    "talk_to_physio": {
+        "en": "Please talk to your physiotherapist about your pain.",
+        "ur": "براہ کرم اپنے درد کے بارے میں فزیوتھراپسٹ سے بات کریں",
     },
     "start": {
         "en": "Get ready. You can start now.",

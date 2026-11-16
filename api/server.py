@@ -13,6 +13,7 @@ Routes
   GET  /api/patients/{id}                   one patient
   GET  /api/patients/{id}/sessions?exercise=E1
   GET  /api/patients/{id}/baseline?exercise=E1   last baseline (to skip calibration)
+  POST /api/sessions/{id}/advice            {"pain": 0-10} -> weight guidance for the next session
   WS   /ws/session                          live session, protocol in api/live.py
   GET  /audio/{lang}_{phrase}.mp3           feedback clips from assets/audio
 
@@ -34,6 +35,10 @@ from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from api.live import LiveSession, exercise_info
+from capture.weight_check import has_weight_check
+from feedback.messages import LANGS, get_feedback
+from session.config import load_config
+from session.weight_advice import advise, set_facts
 from feedback.messages import AUDIO_DIR
 from session.config import CONFIG_DIR
 from storage.db.store import Store
@@ -100,6 +105,40 @@ async def patient_baseline(request):
     return JSONResponse({"baseline": request.app.state.store.latest_baseline(pid, ex)})
 
 
+async def session_advice(request):
+    """Weight guidance after a set: pain is asked on the summary page, the rest is in the saved log."""
+    store = request.app.state.store
+    sid = request.path_params["sid"]
+    try:
+        data = await request.json()
+    except json.JSONDecodeError:
+        data = {}
+    pain = data.get("pain")
+    s = store.get_session(sid)
+    if s is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    cfg = load_config(s["exercise"])
+    if not has_weight_check(cfg["exercise"]):
+        return JSONResponse({"error": "no weight guidance for this exercise"}, status_code=400)
+    if s["weight"] is None:
+        return JSONResponse({"error": "the weight of this session is not known"}, status_code=400)
+    patient = store.get_patient(s["patient_id"]) if s["patient_id"] is not None else None
+    try:
+        advice = advise(set_facts(s["log"] or {}), pain if not isinstance(pain, bool) else None, s["weight"],
+                        (patient or {}).get("max_weight"), store.no_weight_rom(s["patient_id"], s["exercise"]), cfg)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    store.save_advice(sid, pain, advice)
+    prompts = []
+    for key in advice["phrases"]:
+        en, _ = get_feedback(key, "en")
+        ur, _ = get_feedback(key, "ur")
+        prompts.append({"key": key, "en": en, "ur": ur, "reason": "advice",
+                        "audio": {lang: f"/audio/{lang}_{key}.mp3" for lang in LANGS},
+                        "tag": "adjust" if key in ("talk_to_physio",) or advice["action"] == "down" else "good"})
+    return JSONResponse({"advice": advice, "prompts": prompts})
+
+
 # ---------------------------------------------------------------- live session
 
 async def ws_session(ws: WebSocket):
@@ -156,6 +195,7 @@ def create_app(store=None, detector_factory=default_detector, bottle_factory=def
         Route("/api/patients/{pid:int}", get_patient),
         Route("/api/patients/{pid:int}/sessions", patient_sessions),
         Route("/api/patients/{pid:int}/baseline", patient_baseline),
+        Route("/api/sessions/{sid:int}/advice", session_advice, methods=["POST"]),
         WebSocketRoute("/ws/session", ws_session),
         Mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio"),
     ]

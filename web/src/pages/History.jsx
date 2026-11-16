@@ -22,7 +22,7 @@ const inputCls = 'h-14 rounded-xl border-2 border-slate-300 px-4 text-[19px] tex
 export default function History() {
   const { patient, setPatient, mock } = useApp()
   const nav = useNavigate()
-  const [f, setF] = useState(patient ?? { name: '', age: '', strokeDate: '', side: null, pain: 2, conditions: [], doctorOk: null, recentInjury: null, chestDizzy: null })
+  const [f, setF] = useState(patient ?? { name: '', age: '', strokeDate: '', side: null, pain: 2, conditions: [], doctorOk: null, recentInjury: null, chestDizzy: null, physioMaxWeight: null })
   const [error, setError] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -82,6 +82,12 @@ export default function History() {
               <legend className="mb-2.5 p-0 text-lg font-semibold"><Bi k="weakSide" subClassName="text-sm" /></legend>
               <Segmented value={f.side} onChange={set('side')}
                 options={[{ value: 'left', label: <Bi k="left" inline /> }, { value: 'right', label: <Bi k="right" inline /> }]} />
+            </fieldset>
+            <fieldset className="col-span-2 m-0 flex flex-col gap-2.5 border-0 p-0">
+              <legend className="mb-2.5 p-0 text-lg font-semibold"><Bi k="physioMaxWeight" subClassName="text-sm" /></legend>
+              <Segmented value={f.physioMaxWeight} onChange={set('physioMaxWeight')}
+                options={['none', 'light', 'heavy'].map((w) => ({ value: w, label: <Bi k={`weight_${w}`} inline /> }))} />
+              <Txt k="physioMaxHint" className="text-sm font-normal text-slate-600" />
             </fieldset>
             <Field k="painToday" className="col-span-2">
               <div className="flex items-center gap-4">

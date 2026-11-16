@@ -67,7 +67,8 @@ export default function ExerciseChoice() {
                 <div className="flex flex-wrap gap-2.5">
                   <Chip><Clock /><Txt k="about5" /></Chip>
                   <Chip><Reps /><span className="font-en">{arm.max_reps}</span>&nbsp;<Txt k="repetition" /></Chip>
-                  {arm.side ? <Chip tone="adjust"><Txt k="rightArmOnly" /></Chip> : <Chip><Txt k="eitherSide" /></Chip>}
+                  {arm.side ? <Chip tone="adjust"><Txt k="rightArmOnly" /></Chip>
+                    : <Chip>{patient?.side ? <><Txt k={patient.side} /> · <Txt k="weakSideFromForm" /></> : <Txt k="eitherSide" />}</Chip>}
                 </div>
                 {wrongSide && (
                   <p role="alert" className="m-0 rounded-xl bg-amber-100 px-4 py-3 text-[17px] font-medium text-amber-900"><Txt k="sideNotYet" /></p>

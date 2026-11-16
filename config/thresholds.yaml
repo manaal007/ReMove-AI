@@ -38,10 +38,29 @@ weight_check:                    # before calibration, exercises with weight_lim
                                  # STARTING VALUES from bottle sizes: own clips (all small bottles,
                                  # 0.4-0.8) never tested heavy. The patient confirms every time.
 
+weight_guidance:                 # advice after each set, for the NEXT session (E3, E4)
+  # TO CONFIRM WITH PHYSIO: every value below is a starting value from the project brief,
+  # not clinically validated. session/weight_advice.py applies them.
+  levels: [none, light, heavy]   # one step = one level; never more than one per session
+  reference: no_weight_baseline  # range is compared with the patient's latest no-weight baseline range
+  up:                            # move up one level only if ALL of these hold
+    min_good_reps: 8             #   good reps (of max_reps_per_set = 10) in this set
+    min_range_frac: 0.9          #   set range >= 90% of the no-weight baseline range
+    max_compensation_reps: 0     #   no compensation in any rep
+    max_pain: 3                  #   pain after the set 0-3 (of 10)
+  down:                          # move down one level if ANY of these holds
+    max_range_frac: 0.8          #   set range dropped more than 20% (< 80% of the reference)
+    min_compensation_reps: 3     #   compensation in 3+ reps
+    min_pain: 4                  #   pain after the set 4+  -> also "talk to your physio"
+  # otherwise stay. Never above the physio's max level (health form); never changed during a set.
+
 side_view:                       # side-view exercises only (E3, E4)
   max_shoulder_torso_ratio: 0.6  # shoulder width / torso length above this -> turn_sideways
                                  # (own recordings: front view 0.64-0.72, side view mostly < 0.4,
                                  #  one seated side clip up to 0.59; thin margin, recheck with more data)
+  wrong_side_margin: 0.10        # patient's side known: if the OTHER side's required joints are all seen and
+                                 # their mean visibility is this much higher -> show_<side>_side
+                                 # (own clips, near minus far side: curls 0.23-0.41, seated knee 0.07-0.19)
 
 tracking:
   gap_frames_N: 5                # pause (no camera re-check) if tracking is lost for this many frames

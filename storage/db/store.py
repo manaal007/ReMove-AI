@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS patients (
     conditions TEXT,          -- JSON list
     doctor_ok INTEGER,
     recent_injury INTEGER,    -- fracture / dislocation / surgery in the last 6 weeks
-    chest_symptoms INTEGER    -- chest pain, dizziness or breathlessness on movement
+    chest_symptoms INTEGER,   -- chest pain, dizziness or breathlessness on movement
+    max_weight TEXT           -- highest weight level the physio allows: none | light | heavy
 );
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +39,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     baseline TEXT,            -- JSON
     log TEXT,                 -- JSON, the full SessionLog
     weight_suggested TEXT,    -- weight check: none | light | heavy (what the camera saw)
-    weight TEXT               -- the patient's answer (final): none | light | heavy
+    weight TEXT,              -- the patient's answer (final): none | light | heavy
+    pain_after INTEGER,       -- pain 0-10 asked after the set
+    advice TEXT               -- JSON, weight guidance for the next session (session/weight_advice.py)
 );
 """
 
@@ -52,13 +55,14 @@ class Store:
             self.db.executescript(SCHEMA)
             # older remove.db files: add the safety columns if they are missing
             cols = {r["name"] for r in self.db.execute("PRAGMA table_info(patients)")}
-            for col in ("recent_injury", "chest_symptoms"):
+            for col, kind in (("recent_injury", "INTEGER"), ("chest_symptoms", "INTEGER"), ("max_weight", "TEXT")):
                 if col not in cols:
-                    self.db.execute(f"ALTER TABLE patients ADD COLUMN {col} INTEGER")
+                    self.db.execute(f"ALTER TABLE patients ADD COLUMN {col} {kind}")
             cols = {r["name"] for r in self.db.execute("PRAGMA table_info(sessions)")}
-            for col in ("weight_suggested", "weight"):
+            for col, kind in (("weight_suggested", "TEXT"), ("weight", "TEXT"), ("pain_after", "INTEGER"),
+                              ("advice", "TEXT")):
                 if col not in cols:
-                    self.db.execute(f"ALTER TABLE sessions ADD COLUMN {col} TEXT")
+                    self.db.execute(f"ALTER TABLE sessions ADD COLUMN {col} {kind}")
             self.db.commit()
 
     def add_patient(self, p):
@@ -70,13 +74,16 @@ class Store:
         stop = safety_stop(p)
         if stop:
             raise ValueError(f"safety check: {stop}")
+        max_weight = p.get("physioMaxWeight")
+        if max_weight not in (None, *WEIGHT_LEVELS):
+            raise ValueError(f"physioMaxWeight must be one of {WEIGHT_LEVELS}")
         with self.lock, self.db:
             cur = self.db.execute(
                 "INSERT INTO patients (created_at, name, age, stroke_date, weak_side, pain, conditions, doctor_ok, "
-                "recent_injury, chest_symptoms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "recent_injury, chest_symptoms, max_weight) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (datetime.now().isoformat(timespec="seconds"), name, _int(p.get("age")), p.get("strokeDate") or None,
                  p.get("side"), _int(p.get("pain")), json.dumps(p.get("conditions") or []),
-                 _bool(p.get("doctorOk")), _bool(p.get("recentInjury")), _bool(p.get("chestDizzy"))))
+                 _bool(p.get("doctorOk")), _bool(p.get("recentInjury")), _bool(p.get("chestDizzy")), max_weight))
             return cur.lastrowid
 
     def get_patient(self, pid):
@@ -114,6 +121,34 @@ class Store:
             rows = self.db.execute(q, args).fetchall()
         return [dict(r) for r in reversed(rows)]
 
+    def get_session(self, sid):
+        """One session row with its log and advice decoded, or None."""
+        with self.lock:
+            row = self.db.execute("SELECT * FROM sessions WHERE id = ?", (sid,)).fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        for k in ("log", "baseline", "advice"):
+            d[k] = json.loads(d[k]) if d.get(k) else None
+        return d
+
+    def no_weight_rom(self, patient_id, exercise):
+        """Range of the patient's latest baseline recorded with no weight (weight guidance reference)."""
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT baseline FROM sessions WHERE patient_id = ? AND exercise = ? AND weight = 'none' "
+                "AND baseline IS NOT NULL AND baseline != 'null' ORDER BY id DESC", (patient_id, exercise)).fetchall()
+        for r in rows:
+            rom = (json.loads(r["baseline"]) or {}).get("rom")
+            if rom:
+                return float(rom)
+        return None
+
+    def save_advice(self, sid, pain, advice):
+        with self.lock, self.db:
+            self.db.execute("UPDATE sessions SET pain_after = ?, advice = ? WHERE id = ?",
+                            (pain, json.dumps(advice), sid))
+
     def latest_baseline(self, patient_id, exercise):
         """Most recent baseline for this patient + exercise, so calibration can be skipped next time."""
         with self.lock:
@@ -127,6 +162,7 @@ class Store:
 
 
 MAX_NAME = 40
+WEIGHT_LEVELS = ("none", "light", "heavy")
 PAIN_STOP = 7
 
 

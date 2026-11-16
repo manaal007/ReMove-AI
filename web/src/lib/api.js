@@ -16,4 +16,6 @@ export const api = {
   addPatient: (p) => req('/api/patients', { method: 'POST', body: JSON.stringify(p) }),
   sessions: (pid, exercise) => req(`/api/patients/${pid}/sessions?exercise=${encodeURIComponent(exercise)}`),
   lastBaseline: (pid, exercise) => req(`/api/patients/${pid}/baseline?exercise=${encodeURIComponent(exercise)}`),
+  // weight guidance for the next session (session/weight_advice.py): pain is asked after the set
+  advice: (sessionId, pain) => req(`/api/sessions/${sessionId}/advice`, { method: 'POST', body: JSON.stringify({ pain }) }),
 }

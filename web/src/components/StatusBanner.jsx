@@ -10,6 +10,8 @@ const ISSUE = {
   step_back: { en: 'Step back a little', ur: 'تھوڑا پیچھے ہٹیں' },
   come_closer: { en: 'Come a little closer', ur: 'تھوڑا قریب آئیں' },
   turn_sideways: { en: 'Turn sideways to the camera', ur: 'کیمرے کی طرف پہلو کریں' },
+  show_left_side: { en: 'Turn so your left side faces the camera', ur: 'بایاں پہلو کیمرے کی طرف کریں' },
+  show_right_side: { en: 'Turn so your right side faces the camera', ur: 'دایاں پہلو کیمرے کی طرف کریں' },
 }
 
 export default function StatusBanner({ status, connected, error }) {
@@ -24,7 +26,8 @@ export default function StatusBanner({ status, connected, error }) {
     tone = 'bg-red-100 text-red-900'
   } else if (status?.phase === 'weight') {
     if (status.weight !== 'detect') return null      // the weight question card is showing
-    text = STRINGS.weightChecking[lang]
+    const issue = status.issue && ISSUE[status.issue]
+    text = issue ? issue[lang] : STRINGS.weightChecking[lang]   // e.g. turn so the weak side shows
   } else if (status?.checking) {
     const issue = status.issue && ISSUE[status.issue]
     text = `${STRINGS.cameraCheck[lang]}: ${issue ? issue[lang] : STRINGS.holdStill[lang]}`

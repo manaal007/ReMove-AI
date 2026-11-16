@@ -19,12 +19,17 @@ function Item({ k, warn = false }) {
 }
 
 export default function Setup() {
-  const { ex, side, setSide } = useApp()
+  const { ex, side, setSide, patient } = useApp()
   const nav = useNavigate()
   const cam = useCamera(true)
   const arm = ex.group === 'arm'
-  const sideLocked = Boolean(ex.side)   // the engine measures this side only
-  const camKey = ex.camera_view === 'front' ? 'camFront' : ex.camera_view === 'side_right' ? 'camSideRight' : arm ? 'cam2Arm' : 'cam2Leg'
+  // E1: the engine measures the right arm only. Side-view E3/E4: the weak side from the health form.
+  const fromForm = ex.camera_view === 'side' && Boolean(patient?.side)
+  const sideLocked = Boolean(ex.side) || fromForm
+  const camKey = ex.camera_view === 'front' ? 'camFront'
+    : ex.camera_view === 'side_right' || (ex.camera_view === 'side' && side === 'right') ? 'camSideRight'
+    : ex.camera_view === 'side' && side === 'left' ? 'camSideLeft'
+    : arm ? 'cam2Arm' : 'cam2Leg'
 
   return (
     <div className="flex min-h-full flex-col bg-page text-navy">
@@ -37,8 +42,8 @@ export default function Setup() {
             <Bi k={arm ? 'whichArm' : 'whichLeg'} className="text-[19px] font-bold" subClassName="text-[15px]" />
             {sideLocked ? (
               <div className="flex items-center gap-3">
-                <span className="flex min-h-[60px] flex-1 items-center justify-center rounded-xl border-2 border-teal-dark bg-teal-50 text-[19px] font-bold"><Bi k={ex.side} inline /></span>
-                <Chip tone="adjust"><Txt k="rightArmOnly" /></Chip>
+                <span className="flex min-h-[60px] flex-1 items-center justify-center rounded-xl border-2 border-teal-dark bg-teal-50 text-[19px] font-bold"><Bi k={ex.side ?? side ?? patient?.side} inline /></span>
+                <Chip tone="adjust"><Txt k={ex.side ? 'rightArmOnly' : 'weakSideFromForm'} /></Chip>
               </div>
             ) : (
               <Segmented value={side} onChange={setSide}

@@ -6,6 +6,7 @@ import Bi, { Txt } from '../components/Bi.jsx'
 import { Button, Card } from '../components/ui.jsx'
 import { Bot, Check, Share } from '../components/Icons.jsx'
 import { api } from '../lib/api.js'
+import WeightAdvice from '../components/WeightAdvice.jsx'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
@@ -121,6 +122,11 @@ export default function Summary() {
             </div>
           </section>
         </div>
+
+        {/* weight guidance for the next session: E3 / E4 with a known weight, saved session only */}
+        {exercises[r.exercise]?.weight_check && r.weight && r.sessionId != null && !mock && (
+          <WeightAdvice sessionId={r.sessionId} />
+        )}
 
         <div className="flex flex-wrap justify-end gap-3.5">
           <Button variant="outline" className="border-navy" onClick={share}><Share />{copied ? 'Copied ✓' : <Txt k="share" />}</Button>

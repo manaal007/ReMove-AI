@@ -154,6 +154,8 @@ def main():
     ap.add_argument("--lang", choices=LANGS, default="ur")
     ap.add_argument("--timing", choices=TIMING_MODES, help="default: feedback.timing in thresholds.yaml")
     ap.add_argument("--exercise", default="E1")
+    ap.add_argument("--side", choices=("left", "right"),
+                    help="E3/E4: the patient's weak side (default: whichever side the camera sees better)")
     ap.add_argument("--camera", type=int, default=0)
     ap.add_argument("--video", help="use a video file instead of the webcam")
     ap.add_argument("--mute", action="store_true", help="print prompts instead of playing audio")
@@ -167,7 +169,7 @@ def main():
     W, H = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     src_fps = (cap.get(cv2.CAP_PROP_FPS) or 30.0) if args.video else None
 
-    engine = SessionEngine(cfg, W, H, language=args.lang, timing=args.timing)
+    engine = SessionEngine(cfg, W, H, language=args.lang, timing=args.timing, side=args.side)
     player = AudioPlayer(enabled=not args.mute)
     ensure_model()
     options = vision.PoseLandmarkerOptions(

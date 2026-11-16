@@ -15,9 +15,12 @@ Phases
   done      set finished (max_reps_per_set) or stopped
 
 Side-view exercises (side: auto in config/exercises.yaml, E3/E4) measure one
-side of the body: during the camera check each frame is checked on its
-better-seen side, and when the check passes the side seen best over the passing
-frames is locked for the rest of the session (log.side, status()["side"]).
+side of the body. With the patient's weak side given (side=, from the health
+form) that side is used from the first frame; the camera check asks them to turn
+(show_<side>_side) while the other side faces the camera. Without it (CLI,
+research scripts) each check frame is checked on its better-seen side, and the
+side seen best over the passing frames is locked when the check passes.
+Either way: log.side, status()["side"].
 Front-view E1 always measures the side given in its config (right).
 
 Tracking loss after the start never goes back to the camera check. Short gaps
@@ -102,7 +105,7 @@ class SessionLog:
 
 
 class SessionEngine:
-    def __init__(self, cfg, width, height, language="ur", timing=None, baseline=None):
+    def __init__(self, cfg, width, height, language="ur", timing=None, baseline=None, side=None):
         timing = timing or cfg["feedback"]["timing"]
         if timing not in TIMING_MODES:
             raise ValueError(f"timing must be one of {TIMING_MODES}")
@@ -114,7 +117,11 @@ class SessionEngine:
                               datetime.now().isoformat(timespec="seconds"))
         self.ex = cfg["exercise"]
         self.side_view = is_side_view(self.ex)
-        self.side = None if self.side_view else self.ex.get("side")   # side-view: locked at start
+        if side is not None and side not in SIDES:
+            raise ValueError(f"side must be one of {SIDES}")
+        # side-view: the patient's weak side if given (fixed), else locked when the check passes
+        self.fixed_side = bool(self.side_view and side)
+        self.side = (side if self.fixed_side else None) if self.side_view else self.ex.get("side")
         self.side_frames = dict.fromkeys(SIDES, 0)   # passing check frames seen best on each side
         self.phrases = self.ex.get("phrases") or {}
         self.log.side = self.side
@@ -216,10 +223,11 @@ class SessionEngine:
 
     def _camera_check(self, t, lm, gray, out):
         frame_side = None
-        if self.side_view and lm is not None:
+        if self.side_view and lm is not None and not self.fixed_side:
             frame_side = best_side(lm, self.ex["required_landmarks"])
         issues = check_frame(lm, gray, self.cfg, side=frame_side,
-                             aspect=self.W / self.H if self.side_view and self.H else None)
+                             aspect=self.W / self.H if self.side_view and self.H else None,
+                             wanted_side=self.side if self.fixed_side else None)
         if issues:
             self.pass_count = 0
             self.side_frames = dict.fromkeys(SIDES, 0)
@@ -233,7 +241,7 @@ class SessionEngine:
             self.side_frames[frame_side] += 1
         if self.pass_count >= self.cfg["camera_check"]["pass_frames"]:
             self.checking = False
-            if self.side_view:
+            if self.side_view and not self.fixed_side:
                 self.side = max(SIDES, key=lambda s: self.side_frames[s])
                 self.log.side = self.side
             self.counter = RepCounter(self.cfg)

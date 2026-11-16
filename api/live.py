@@ -9,7 +9,8 @@ Protocol (browser -> server)
   text   {"type": "start", "mode": "calibration" | "session", "exercise": "E1",
           "lang": "ur" | "en", "timing": null | "every_rep" | "every_3_4_reps",
           "baseline": {...} | null, "patient_id": 1 | null,
-          "weight": null | "none" | "light" | "heavy"}
+          "weight": null | "none" | "light" | "heavy",
+          "side": null | "left" | "right"}   E3/E4: the patient's weak side (health form)
   bytes  one JPEG frame, NOT mirrored (pose angles in config are unmirrored)
   text   {"type": "weight", "choice": "none" | "light" | "heavy"}   the patient's answer
   text   {"type": "stop"}
@@ -45,10 +46,11 @@ import time
 
 import numpy as np
 
+from capture.camera_check import check_frame
 from capture.weight_check import (WEIGHT_CLASSES, WeightVote, crop_region, has_weight_check,
                                   limb_geometry, observe)
 from feedback.messages import LANGS, get_feedback, phrase_key
-from features.signals import SIDE_LM, best_side
+from features.signals import SIDE_LM, SIDES, best_side
 from session.config import TIMING_MODES, is_side_view, load_config
 from session.engine import Prompt, SessionEngine
 
@@ -177,6 +179,10 @@ class LiveSession:
         self.mode, self.lang, self.timing = mode, lang, timing
         self.baseline = clean_baseline(msg.get("baseline")) if mode == "session" else None
         self.patient_id = msg.get("patient_id")
+        side = msg.get("side")
+        if side is not None and side not in SIDES:
+            raise ValueError(f"side must be one of {SIDES}")
+        self.side = side if is_side_view(self.cfg["exercise"]) else None
         chosen = msg.get("weight")
         if chosen is not None and chosen not in WEIGHT_CLASSES:
             raise ValueError(f"weight must be one of {WEIGHT_CLASSES}")
@@ -207,10 +213,10 @@ class LiveSession:
 
         lm, gray, W, H = self.detector.detect(jpeg, ms)
         if self.weight_state is not None:
-            return self._weight_frame(t, lm, W, H)
+            return self._weight_frame(t, lm, gray, W, H)
         if self.engine is None:
             self.engine = SessionEngine(self.cfg, W, H, language=self.lang,
-                                        timing=self.timing, baseline=self.baseline)
+                                        timing=self.timing, baseline=self.baseline, side=self.side)
         prompts = self.engine.process(t, lm, gray)
         new = self.engine.log.reps[self.n_reps:]
         self.n_reps += len(new)
@@ -238,17 +244,24 @@ class LiveSession:
         """The patient's answer to the weight question: final, saved with the session."""
         if not self.started:
             raise RuntimeError("send a start message first")
+        if self.engine is not None or self.weight_state is None:
+            raise ValueError("the weight cannot change during a set")
         if choice not in WEIGHT_CLASSES:
             raise ValueError(f"weight must be one of {WEIGHT_CLASSES}")
         self.weight["chosen"] = choice
         self.weight_state = None                          # the engine starts on the next frame
         return [{"type": "weight_saved", "chosen": choice}]
 
-    def _weight_frame(self, t, lm, W, H):
+    def _weight_frame(self, t, lm, gray, W, H):
         ex = self.cfg["exercise"]
         out = []
+        # camera guidance while waiting (shown, not spoken): e.g. show_right_side
+        issues = check_frame(lm, gray, self.cfg, aspect=W / H if H else None, wanted_side=self.side)
+        facing_ok = not any(i in ("not_tracked", "turn_sideways", "show_left_side", "show_right_side")
+                            for i in issues)
         if self.weight_state == "detect":
-            geo = limb_geometry(lm, ex, W, H) if lm is not None else None
+            # the patient's weak-side wrist / ankle, and only while that side faces the camera
+            geo = limb_geometry(lm, ex, W, H, side=self.side) if lm is not None and facing_ok else None
             ratio = None
             if geo is not None:
                 region = crop_region(geo[0], geo[1], W, H, self.cfg)
@@ -265,9 +278,9 @@ class LiveSession:
                 out.append({"type": "weight", "suggested": res["suggested"], "evidence": res,
                             "prompt": prompt_dict(Prompt(key, text, str(audio), "session", key))})
         status = {"phase": "weight", "checking": True, "paused": False, "weight": self.weight_state,
-                  "issue": None if lm is not None else "not_tracked", "angle": None, "in_rep": False}
+                  "issue": issues[0] if issues else None, "angle": None, "in_rep": False, "side": self.side}
         frame = {"type": "frame", "status": status, "prompts": [], "reps": [],
-                 "points": points(lm, self.cfg["visibility"]["min_landmark_visibility"], ex=ex)}
+                 "points": points(lm, self.cfg["visibility"]["min_landmark_visibility"], ex=ex, side=self.side)}
         return [frame] + out
 
     def stop(self, reason="user_stopped"):

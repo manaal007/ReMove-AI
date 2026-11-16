@@ -21,7 +21,7 @@ let msgId = 0
 const coachMsg = (p) => ({ id: ++msgId, kind: 'coach', en: p.en, ur: p.ur, tag: p.tag ?? 'adjust', dir: p.dir, audio: p.audio, key: p.key })
 const systemMsg = (en, ur) => ({ id: ++msgId, kind: 'system', en, ur })
 
-export default function usePoseStream({ videoRef, ex, mode, baseline, weight, patientId, lang, active, onPrompt }) {
+export default function usePoseStream({ videoRef, ex, mode, baseline, weight, side, patientId, lang, active, onPrompt }) {
   const [angle, setAngle] = useState(0)
   const [points, setPoints] = useState(null)
   const [reps, setReps] = useState([])
@@ -84,7 +84,7 @@ export default function usePoseStream({ videoRef, ex, mode, baseline, weight, pa
 
     ws.onopen = () => {
       setConnected(true)
-      ws.send(JSON.stringify({ type: 'start', mode, exercise: ex.id, lang, baseline: baseline ?? null, patient_id: patientId ?? null, weight: weight ?? null }))
+      ws.send(JSON.stringify({ type: 'start', mode, exercise: ex.id, lang, baseline: baseline ?? null, patient_id: patientId ?? null, weight: weight ?? null, side: side ?? null }))
     }
     ws.onclose = () => { setConnected(false); closed = true }
     ws.onerror = () => { setConnected(false); setError('connection') }

@@ -33,7 +33,7 @@ export default function Session() {
   const max = gaugeMax(ex)
 
   const pose = usePoseStream({
-    videoRef: cam.videoRef, ex, mode: 'session', baseline, weight, lang, patientId: patient?.id,
+    videoRef: cam.videoRef, ex, mode: 'session', baseline, weight, side, lang, patientId: patient?.id,
     active: playing && !painStop && (cam.status === 'on' || mock),
     onPrompt: (m) => { lastCoach.current = m; voice.speak(m) },
   })
