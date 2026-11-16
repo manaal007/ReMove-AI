@@ -94,7 +94,7 @@ def test_overrides_apply_to_one_exercise_only():
 
 
 def test_compensation_limits_from_spec():
-    assert load_config("E3")["exercise"]["compensation"] == {"signal": "shoulder_angle", "max_change_deg": 20}
+    assert load_config("E3")["exercise"]["compensation"] == {"signal": "shoulder_angle", "baseline_margin_deg": 15}
     assert load_config("E4")["exercise"]["compensation"] == {"signal": "trunk_angle", "max_change_deg": 15}
 
 
@@ -157,11 +157,44 @@ def _feat(**kw):
     return f
 
 
-@pytest.mark.parametrize("ex_id,limit", [("E3", 20), ("E4", 15)])
-def test_compensation_threshold_per_exercise(ex_id, limit):
-    cfg = load_config(ex_id)
-    assert "trunk_compensation" not in find_faults(_feat(comp_change_max=limit - 0.5), cfg)
-    assert find_faults(_feat(comp_change_max=limit + 0.5), cfg) == ["trunk_compensation"]
+def test_e4_lean_limit_is_absolute():
+    cfg = load_config("E4")
+    assert "trunk_compensation" not in find_faults(_feat(comp_change_max=14.5), cfg)
+    assert find_faults(_feat(comp_change_max=15.5), cfg) == ["trunk_compensation"]
+
+
+E3_BASE = {"rom": 100.0, "duration_s": 3.0, "sparc": -1.5, "peak_angle": 110.0, "min_angle": 10.0,
+           "jerk_norm": 1e5, "comp_change_max": 25.0}
+
+
+@pytest.mark.parametrize("swing,flagged", [(25.0, False), (40.0, False), (40.5, True), (60.0, True)])
+def test_e3_swing_is_relative_to_own_baseline(swing, flagged):
+    cfg = load_config("E3")                           # limit = 25 + 15 = 40
+    assert ("trunk_compensation" in find_faults(_feat(comp_change_max=swing), cfg, E3_BASE)) == flagged
+
+
+def test_e3_swing_rule_needs_a_baseline_swing():
+    cfg = load_config("E3")
+    assert find_faults(_feat(comp_change_max=80.0), cfg) == []                    # calibration
+    old = {k: v for k, v in E3_BASE.items() if k != "comp_change_max"}            # older baseline
+    assert "trunk_compensation" not in find_faults(_feat(comp_change_max=80.0), cfg, old)
+    nan = {**E3_BASE, "comp_change_max": float("nan")}
+    assert "trunk_compensation" not in find_faults(_feat(comp_change_max=80.0), cfg, nan)
+
+
+def test_baseline_has_swing_only_for_side_view():
+    from session.rules import build_baseline
+    side = build_baseline([_feat(comp_change_max=s) for s in (20.0, 25.0, 40.0)])
+    assert side["comp_change_max"] == 25.0
+    e1 = build_baseline([{k: v for k, v in _feat().items() if not k.startswith("comp")}] * 3)
+    assert "comp_change_max" not in e1
+
+
+def test_browser_baseline_keeps_swing():
+    from api.live import clean_baseline
+    b = clean_baseline({**E3_BASE})
+    assert b["comp_change_max"] == 25.0
+    assert "comp_change_max" not in clean_baseline({k: v for k, v in E3_BASE.items() if k != "comp_change_max"})
 
 
 def test_side_view_uses_the_same_six_labels():
@@ -232,6 +265,19 @@ class Sim:
         return [r["label"] for r in self.e.log.reps]
 
 
+def test_e3_person_who_always_swings_is_judged_against_own_swing():
+    s = Sim("E3")
+    s.settle()
+    for _ in range(3):
+        s.rep(comp=25)                        # this person swings 25 deg on every curl
+    # measured from the mean of the first 5 rep frames, which already hold ~2 deg of the swing
+    assert s.e.log.baseline["comp_change_max"] == pytest.approx(25, abs=3)
+    s.rep(comp=25)                            # their normal swing: good
+    s.rep(comp=35)                            # +10: still good
+    s.rep(comp=50)                            # +25: flagged
+    assert s.labels()[3:] == ["good", "good", "trunk_compensation"]
+
+
 @pytest.mark.parametrize("side", ["left", "right"])
 def test_side_is_locked_when_the_camera_check_passes(ex_id, side):
     s = Sim(ex_id)
@@ -246,11 +292,12 @@ def test_full_e3_session_labels_and_wording():
     s = Sim("E3")
     s.settle()
     for _ in range(3):
-        s.rep()
+        s.rep()                               # baseline swing ~0
     assert s.e.phase == "scoring"
+    assert s.e.log.baseline["comp_change_max"] == pytest.approx(0, abs=1)
     s.rep()                                   # 4 good
     s.rep(high=60)                            # 5 reduced_range (60 vs 120 range)
-    s.rep(comp=30)                            # 6 upper arm swings 30 > 20
+    s.rep(comp=30)                            # 6 upper arm swings 30 > 0 + 15
     s.rep(comp=12)                            # 7 small swing: fine
     s.rep(duration_s=1.2)                     # 8 too fast
     assert s.labels() == ["good"] * 4 + ["reduced_range", "trunk_compensation", "good", "too_fast"]

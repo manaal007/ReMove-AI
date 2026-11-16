@@ -125,7 +125,12 @@ def print_summary(log, cfg):
             print("  jerky          off (baseline has no SPARC value)")
         if ex.get("compensation"):
             c = ex["compensation"]
-            print(f"  compensation   {c['signal']} change > {c['max_change_deg']} deg   (side measured: {log.side})")
+            if "baseline_margin_deg" in c:
+                bs = b.get("comp_change_max")
+                lim = f"{bs:.1f} + {c['baseline_margin_deg']} = {bs + c['baseline_margin_deg']:.1f}" if bs is not None else "off (no baseline swing)"
+                print(f"  compensation   {c['signal']} change > baseline {lim} deg   (side measured: {log.side})")
+            else:
+                print(f"  compensation   {c['signal']} change > {c['max_change_deg']} deg   (side measured: {log.side})")
         else:
             print(f"  trunk          lean > {ex['max_trunk_lean_deg']} deg")
     else:

@@ -7,16 +7,21 @@ video frame, with time_s). One clip is 240 fps slow motion, so frames are picked
 by time_s, never by frame count: the engine is fed one frame every 1/fps seconds
 of real time, like the browser app (it sends at most 15 frames per second).
 
-The videos themselves are not in the repo, so the frame size is assumed:
-portrait phone video, 1080 x 1920. (Fitting the constant forearm / shin length
-gives width/height 0.50-0.70 on every usable clip, i.e. portrait.)
+Frame size comes from the manifest: width, height = the video file's stored size,
+rotated = yes when the phone saved it with a 90-degree rotation flag. OpenCV
+(5.0, CAP_PROP_ORIENTATION_AUTO) turns such frames upright before MediaPipe sees
+them, so the landmarks are normalized to height x width and the two are swapped.
+Checked on the data: with the swap, forearm / shin length stays 2-4x steadier
+(it cannot change as the limb rotates) than with the stored landscape size.
 
 Two modes:
   full        (default) the whole live pipeline: camera check -> baseline -> scoring.
               A clip whose framing fails the camera check never starts, as in the app.
   count-only  (--count-only) skip the camera check: the counter starts on the first
               frame, on the side seen best over the whole clip. Shows what the rep
-              counter does even when the framing would be rejected live.
+              counter does even when the framing would be rejected live. E4 trunk-lean
+              flags are dropped for reps where the shoulder was off-screen (its
+              position is then MediaPipe's guess); live sessions ask to reframe instead.
 
 Run from inside remove-pk:
     python research/eval_own_landmarks.py               # 15 fps (live app rate)
@@ -33,15 +38,20 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.getcwd())
-from features.signals import ALL_LM, best_side  # noqa: E402
+from features.signals import ALL_LM, SIDE_LM, best_side  # noqa: E402
 from session.config import load_config  # noqa: E402
 from session.engine import SessionEngine  # noqa: E402
 from session.rep_counter import RepCounter  # noqa: E402
 
 DATA_DIR = os.path.join("data", "own", "landmarks")
 MANIFEST = os.path.join(DATA_DIR, "manifest.csv")
-W, H = 1080, 1920
 GRAY = 128.0          # no video, so brightness is assumed fine
+
+
+def frame_size(row):
+    """(width, height) of the frames MediaPipe saw, from a manifest row."""
+    w, h = int(row["width"]), int(row["height"])
+    return (h, w) if str(row.get("rotated", "no")).strip().lower() == "yes" else (w, h)
 
 
 def frames_by_time(df, fps):
@@ -66,7 +76,7 @@ def _skip_camera_check(e, side):
         e.side = e.log.side = side
 
 
-def run_file(path, exercise, fps=15.0, width=W, height=H, cfg=None, count_only=False):
+def run_file(path, exercise, fps=15.0, width=576, height=1024, cfg=None, count_only=False):
     """Feed one landmark CSV to a fresh engine. Returns (engine, frames fed)."""
     cfg = cfg or load_config(exercise)
     raw = pd.read_csv(path)
@@ -84,7 +94,31 @@ def run_file(path, exercise, fps=15.0, width=W, height=H, cfg=None, count_only=F
         if e.done:
             break
     e.stop("video_ended")
-    return e, len(df)
+    return e, df
+
+
+def drop_offscreen_trunk_flags(e, df):
+    """Count-only evaluation: a trunk-angle flag is not trusted when the shoulder was
+    outside the frame at any point of the rep (MediaPipe then guesses where it is).
+    Live sessions never get here: their camera check asks to move the chair / camera.
+    Edits e.log.reps in place (label, faults, trunk_ignored). Returns how many were dropped."""
+    comp = e.cfg["exercise"].get("compensation") or {}
+    if comp.get("signal") != "trunk_angle" or e.log.side is None:
+        return 0
+    sh = SIDE_LM[e.log.side]["shoulder"]
+    x, y = df[f"x{sh}"].to_numpy(), df[f"y{sh}"].to_numpy()
+    dropped = 0
+    for r in e.log.reps:
+        if "trunk_compensation" not in r["faults"]:
+            continue
+        sl = slice(r["start_frame"], r["end_frame"] + 1)
+        on_screen = (x[sl] >= 0) & (x[sl] <= 1) & (y[sl] >= 0) & (y[sl] <= 1)
+        if not on_screen.all():
+            r["faults"] = [f for f in r["faults"] if f != "trunk_compensation"]
+            r["label"] = r["faults"][0] if r["faults"] else "good"
+            r["trunk_ignored"] = True
+            dropped += 1
+    return dropped
 
 
 def summarize(e):
@@ -112,16 +146,22 @@ def main():
     if not args.all:
         m = m[m["usable"] != "no"]
     mode = "count-only (no camera check)" if args.count_only else "full pipeline"
-    print(f"{mode}; engine fed at {fps or 'native'} fps by time_s; frame size assumed {W}x{H}\n")
-    print(f"{'file':28s} {'ex':3s} {'usable':6s} {'side':5s} {'start':>5s} {'manifest':>8s} {'found':>5s}  labels")
+    print(f"{mode}; engine fed at {fps or 'native'} fps by time_s; frame size from manifest\n")
+    print(f"{'file':28s} {'ex':3s} {'usable':6s} {'frame':>8s} {'side':5s} {'start':>5s} "
+          f"{'manifest':>8s} {'found':>5s}  labels")
     for _, r in m.iterrows():
         ex = r["exercise"].split("_")[0]
-        e, _ = run_file(os.path.join(DATA_DIR, r["file"]), ex, fps, count_only=args.count_only)
+        w, h = frame_size(r)
+        e, df = run_file(os.path.join(DATA_DIR, r["file"]), ex, fps, width=w, height=h,
+                         count_only=args.count_only)
+        dropped = drop_offscreen_trunk_flags(e, df) if args.count_only else 0
         s = summarize(e)
         labels = ", ".join(f"{k} {v}" for k, v in s["labels"].most_common())
         extra = f"  [camera: {dict(s['camera_prompts'])}]" if s["camera_prompts"] else ""
+        if dropped:
+            extra += f"  [{dropped} trunk flag(s) ignored: shoulder off-screen]"
         start = f"{s['start_s']:.1f}" if s["start_s"] is not None else "-"
-        print(f"{r['file']:28s} {ex:3s} {r['usable']:6s} {str(s['side']):5s} {start:>5s} "
+        print(f"{r['file']:28s} {ex:3s} {r['usable']:6s} {f'{w}x{h}':>8s} {str(s['side']):5s} {start:>5s} "
               f"{str(r['reps_approx']):>8s} {s['found']:5d}  {labels}{extra}")
 
 

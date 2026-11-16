@@ -38,7 +38,8 @@ E2:
 # primary_angle always RISES during the effort phase (see features/signals.py),
 # so rep detection and the six-label rules are the same as E1.
 # required_landmarks: joints of the chosen side that must be seen (camera check + tracking).
-# compensation: change of this angle from the rep start above max_change_deg -> trunk_compensation
+# compensation: change of this angle from the rep start -> trunk_compensation when it is above
+#   max_change_deg (absolute), or above the person's baseline change + baseline_margin_deg (relative)
 # phrases: rep label / prompt -> phrase key in feedback/messages.py, where E1's wording does not fit.
 # overrides: values that replace thresholds.yaml for this exercise only.
 
@@ -55,7 +56,9 @@ E3:
   max_safe_deg: 145                   # normal adult elbow flexion is about 145-150
   compensation:
     signal: shoulder_angle            # hip - shoulder - elbow: upper arm swinging forward / back
-    max_change_deg: 20
+    baseline_margin_deg: 15           # flag only if the swing is > own baseline swing + 15
+                                      # (an absolute 20 flagged 9/9 reps of a clean volunteer clip:
+                                      #  everyone swings 17-32 deg on every curl)
   phrases:
     reduced_range: bend_more
     too_fast: too_fast_elbow

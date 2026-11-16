@@ -3,8 +3,12 @@ Six-label rules for v1 (no ML).
 
   not_tracked         rep features invalid (too many missing frames) or tracking lost mid-rep
   trunk_compensation  E1: trunk_lean_max > exercise max_trunk_lean_deg (sideways lean)
-                      side-view exercises (E3, E4): comp_change_max > compensation.max_change_deg
-                      (E3 upper arm swinging: shoulder angle; E4 leaning back: trunk angle)
+                      E4 (absolute): comp_change_max > compensation.max_change_deg
+                          (leaning back: trunk angle change during the rep)
+                      E3 (relative): comp_change_max > baseline comp_change_max
+                          + compensation.baseline_margin_deg (upper arm swing: shoulder
+                          angle). Most people swing the upper arm a little on every
+                          curl (own volunteers: 17-32 deg), so only extra swing counts.
   too_fast            duration_s < too_fast_frac   * baseline duration_s
   jerky               sparc      < jerky_sparc_ratio * baseline sparc
                       (SPARC is negative, so this means "ratio times less smooth";
@@ -18,6 +22,8 @@ Six-label rules for v1 (no ML).
 The baseline is the median of the person's clean calibration reps. Only the
 two absolute rules (not_tracked, trunk_compensation) can be checked before a
 baseline exists, so those are what decide if a calibration rep is clean.
+E3's relative swing rule needs a baseline, so it cannot fire on calibration reps
+(the baseline swing is a median, so one big swing there moves it little).
 
 Jerky used to compare dimensionless jerk (jerk_norm) with the baseline, but
 tracking noise makes jerk_norm grow roughly with duration^6, so slow smooth reps
@@ -33,13 +39,16 @@ from collections import Counter
 import numpy as np
 
 BASELINE_KEYS = ("rom", "duration_s", "jerk_norm", "sparc", "peak_angle", "min_angle")
+OPTIONAL_BASELINE_KEYS = ("comp_change_max",)    # side-view exercises only (E3 swing rule)
 ABSOLUTE = ("not_tracked", "trunk_compensation")
 
 
 def build_baseline(feature_list):
-    """Median of each baseline key over clean calibration reps (missing values skipped)."""
+    """Median of each baseline key over clean calibration reps (missing values skipped).
+    Optional keys are added only when the features have them, so E1 baselines are unchanged."""
     out = {}
-    for k in BASELINE_KEYS:
+    keys = BASELINE_KEYS + tuple(k for k in OPTIONAL_BASELINE_KEYS if any(k in f for f in feature_list))
+    for k in keys:
         vals = [f[k] for f in feature_list if f.get(k) is not None and not np.isnan(f[k])]
         out[k] = float(np.median(vals)) if vals else None
     return out
@@ -61,11 +70,17 @@ def _is_jerky(feat, baseline, ratio):
     return s < ratio * b
 
 
-def _is_compensating(feat, ex):
+def _is_compensating(feat, ex, baseline=None):
     comp = ex.get("compensation")
-    if comp:
-        return feat["comp_change_max"] > comp["max_change_deg"]
-    return feat["trunk_lean_max"] > ex["max_trunk_lean_deg"]
+    if not comp:                                   # E1
+        return feat["trunk_lean_max"] > ex["max_trunk_lean_deg"]
+    swing = feat["comp_change_max"]
+    if "baseline_margin_deg" in comp:              # E3: relative to the person's own swing
+        b = (baseline or {}).get("comp_change_max")
+        if b is None or np.isnan(b):               # calibration, or a baseline saved without it
+            return False
+        return swing > b + comp["baseline_margin_deg"]
+    return swing > comp["max_change_deg"]          # E4: absolute
 
 
 def find_faults(feat, cfg, baseline=None):
@@ -75,7 +90,7 @@ def find_faults(feat, cfg, baseline=None):
     if not feat.get("valid", False):
         fired.add("not_tracked")
     else:
-        if _is_compensating(feat, ex):
+        if _is_compensating(feat, ex, baseline):
             fired.add("trunk_compensation")
         if baseline is not None:
             if feat["duration_s"] < rules["too_fast_frac"] * baseline["duration_s"]:

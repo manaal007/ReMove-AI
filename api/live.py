@@ -93,7 +93,9 @@ def clean_baseline(b):
     if not isinstance(b, dict):
         return None
     out = {}
-    for k in ("rom", "duration_s", "jerk_norm", "sparc", "peak_angle", "min_angle"):
+    for k in ("rom", "duration_s", "jerk_norm", "sparc", "peak_angle", "min_angle", "comp_change_max"):
+        if k == "comp_change_max" and k not in b:     # only side-view baselines have it
+            continue
         v = b.get(k)
         out[k] = float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
     if any(out[k] is None for k in REQUIRED_BASELINE):

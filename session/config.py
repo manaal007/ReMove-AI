@@ -60,8 +60,10 @@ def validate(cfg):
         if ex.get("primary_angle") not in PRIMARY_ANGLES:
             raise ValueError(f"primary_angle must be one of {PRIMARY_ANGLES}")
         comp = ex.get("compensation") or {}
-        if comp.get("signal") not in COMPENSATION_SIGNALS or not comp.get("max_change_deg"):
-            raise ValueError(f"compensation needs signal in {COMPENSATION_SIGNALS} and max_change_deg")
+        limits = [k for k in ("max_change_deg", "baseline_margin_deg") if comp.get(k)]
+        if comp.get("signal") not in COMPENSATION_SIGNALS or len(limits) != 1:
+            raise ValueError(f"compensation needs signal in {COMPENSATION_SIGNALS} and exactly one of "
+                             "max_change_deg (absolute) or baseline_margin_deg (relative to baseline)")
         req = ex.get("required_landmarks") or []
         if not req or any(j not in SIDE_JOINTS for j in req):
             raise ValueError(f"required_landmarks must be a non-empty list of {SIDE_JOINTS}")
