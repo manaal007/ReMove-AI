@@ -13,3 +13,5 @@ web/.vite/
 web/node_modules/
 web/dist/
 web/.env
+
+.pytest_cache/

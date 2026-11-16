@@ -32,9 +32,12 @@ export default function ExerciseChoice() {
     nav('/setup')
   }
   const label = (e, l) => (l === 'ur' ? e.label_ur : e.label_en)
-  // the engine measures one side per exercise; a patient whose weak side differs can't use it yet
-  const wrongSide = Boolean(arm?.side && patient?.side && patient.side !== arm.side)
-  const armOk = arm && available(arm) && !wrongSide
+  // Two different blocks: "not ready at all" (ready: false, e.g. E2) shows "Coming soon";
+  // "ready, but only for the other arm" (e.g. E1 is right-arm only) names the patient's arm.
+  const notReady = Boolean(arm && !available(arm))
+  const wrongSide = Boolean(!notReady && arm?.side && patient?.side && patient.side !== arm.side)
+  const armOk = arm && !notReady && !wrongSide
+  const armBlockedKey = patient?.side === 'left' ? 'notForLeftArm' : 'notForRightArm'
 
   return (
     <div className="flex min-h-full flex-col bg-page text-navy">
@@ -71,13 +74,17 @@ export default function ExerciseChoice() {
                     : <Chip>{patient?.side ? <><Txt k={patient.side} /> · <Txt k="weakSideFromForm" /></> : <Txt k="eitherSide" />}</Chip>}
                 </div>
                 {wrongSide && (
-                  <p role="alert" className="m-0 rounded-xl bg-amber-100 px-4 py-3 text-[17px] font-medium text-amber-900"><Txt k="sideNotYet" /></p>
+                  <p role="alert" className="m-0 flex flex-col gap-1 rounded-xl bg-amber-100 px-4 py-3 text-[17px] font-medium text-amber-900">
+                    <Txt k="sideNotYet" />
+                    <Txt k="tryElbowBend" className="font-semibold" />
+                  </p>
                 )}
-                {!wrongSide && !available(arm) && (
+                {notReady && (
                   <p className="m-0 rounded-xl bg-slate-100 px-4 py-3 text-[17px] font-medium text-navy"><Txt k="notTestedYet" /></p>
                 )}
                 <Button size="lg" onClick={() => choose(arm)} disabled={!armOk} className="w-full">
-                  {armOk ? <Bi k="startArm" inline subClassName="text-[17px]" /> : <Txt k="comingSoon" />}
+                  {armOk ? <Bi k="startArm" inline subClassName="text-[17px]" />
+                    : notReady ? <Txt k="comingSoon" /> : <Bi k={armBlockedKey} inline subClassName="text-[17px]" />}
                 </Button>
               </div>
             </Card>
