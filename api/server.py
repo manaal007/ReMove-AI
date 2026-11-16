@@ -125,7 +125,8 @@ async def session_advice(request):
     patient = store.get_patient(s["patient_id"]) if s["patient_id"] is not None else None
     try:
         advice = advise(set_facts(s["log"] or {}), pain if not isinstance(pain, bool) else None, s["weight"],
-                        (patient or {}).get("max_weight"), store.no_weight_rom(s["patient_id"], s["exercise"]), cfg)
+                        (patient or {}).get("max_weight"), store.no_weight_rom(s["patient_id"], s["exercise"]), cfg,
+                        prior_streak=store.qualifying_streak(s["patient_id"], s["exercise"], s["weight"], sid))
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     store.save_advice(sid, pain, advice)

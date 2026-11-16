@@ -29,7 +29,7 @@ PROMPTS = ("step_back", "come_closer", "too_dark", "too_bright", "start", "rest"
            "weight_ask_none", "weight_ask_light", "weight_ask_heavy",
            # weight guidance after the set (session/weight_advice.py)
            "weight_up_light", "weight_up_heavy", "weight_down_light", "weight_down_none",
-           "weight_stay", "weight_at_max", "talk_to_physio")
+           "weight_stay", "weight_stay_one_more", "weight_at_max", "talk_to_physio")
 
 # rep label -> phrase key (labels not listed use their own name)
 LABEL_TO_PHRASE = {
@@ -163,6 +163,10 @@ PHRASES = {
     "weight_stay": {
         "en": "Keep the same weight next session.",
         "ur": "اگلی بار بھی یہی وزن رکھیں",
+    },
+    "weight_stay_one_more": {
+        "en": "Stay at this weight. If next session goes as well, you can try the next weight.",
+        "ur": "اسی وزن پر رہیں۔ اگر اگلی بار بھی اتنی ہی اچھی ورزش ہوئی تو آپ اگلا وزن آزما سکتے ہیں",
     },
     "weight_at_max": {
         "en": "Very good. Keep this weight: it is the most your physiotherapist allows.",

@@ -48,6 +48,8 @@ weight_guidance:                 # advice after each set, for the NEXT session (
     min_range_frac: 0.9          #   set range >= 90% of the no-weight baseline range
     max_compensation_reps: 0     #   no compensation in any rep
     max_pain: 3                  #   pain after the set 0-3 (of 10)
+    consecutive_sessions: 2      #   ... in this many sessions in a row, same exercise and weight
+                                 #   (2-for-2 rule; after the first: "stay, if next goes as well, try the next weight")
   down:                          # move down one level if ANY of these holds
     max_range_frac: 0.8          #   set range dropped more than 20% (< 80% of the reference)
     min_compensation_reps: 3     #   compensation in 3+ reps

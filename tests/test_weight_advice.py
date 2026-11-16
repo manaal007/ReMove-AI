@@ -23,8 +23,9 @@ def facts(good=9, comp=0, rng=95.0, scored=10):
     return {"scored": scored, "good": good, "compensation": comp, "range": rng}
 
 
-def adv(cfg, f=None, pain=1, current="none", max_level="heavy", ref=REF):
-    return advise(f or facts(), pain, current, max_level, ref, cfg)
+def adv(cfg, f=None, pain=1, current="none", max_level="heavy", ref=REF, prior=1):
+    """prior: qualifying sessions in a row before this one (1 = this one completes the 2-for-2)."""
+    return advise(f or facts(), pain, current, max_level, ref, cfg, prior_streak=prior)
 
 
 # ---------------------------------------------------------------- config
@@ -34,6 +35,7 @@ def test_rules_are_in_config_and_marked_for_the_physio(cfg):
     assert g["levels"] == ["none", "light", "heavy"]
     assert (g["up"]["min_good_reps"], g["up"]["min_range_frac"], g["up"]["max_compensation_reps"], g["up"]["max_pain"]) == (8, 0.9, 0, 3)
     assert (g["down"]["max_range_frac"], g["down"]["min_compensation_reps"], g["down"]["min_pain"]) == (0.8, 3, 4)
+    assert g["up"]["consecutive_sessions"] == 2
     text = (Path(CONFIG_DIR) / "thresholds.yaml").read_text(encoding="utf-8")
     block = text[text.index("weight_guidance:"):text.index("side_view:")]
     assert "TO CONFIRM WITH PHYSIO" in block
@@ -41,14 +43,65 @@ def test_rules_are_in_config_and_marked_for_the_physio(cfg):
 
 # ---------------------------------------------------------------- move up
 
-def test_all_criteria_met_moves_up_one_level(cfg):
-    a = adv(cfg, facts(good=8, comp=0, rng=90.0), pain=3)
+def test_all_criteria_met_twice_in_a_row_moves_up_one_level(cfg):
+    a = adv(cfg, facts(good=8, comp=0, rng=90.0), pain=3, prior=1)
     assert (a["action"], a["next"], a["reasons"]) == ("up", "light", ["all_criteria_met"])
     assert a["phrases"] == ["weight_up_light"] and not a["talk_to_physio"]
     assert a["range_frac"] == 0.9
+    assert (a["up_qualified"], a["qualifying_streak"], a["sessions_needed"]) == (True, 2, 2)
 
 
-def test_never_more_than_one_level(cfg):
+# ---------------------------------------------------------------- 2-for-2 rule
+
+def test_first_qualifying_session_stays_with_one_more_message(cfg):
+    a = adv(cfg, prior=0)
+    assert (a["action"], a["next"], a["reasons"]) == ("stay", "none", ["qualified_need_more"])
+    assert a["phrases"] == ["weight_stay_one_more"]
+    assert a["up_qualified"] and a["qualifying_streak"] == 1
+
+
+def test_the_one_more_message_text():
+    from feedback.messages import get_feedback
+    assert get_feedback("weight_stay_one_more", "en")[0] == \
+        "Stay at this weight. If next session goes as well, you can try the next weight."
+    assert get_feedback("weight_stay_one_more", "ur")[0]
+
+
+def test_a_longer_run_still_moves_up_only_one_level(cfg):
+    a = adv(cfg, prior=5, current="none")
+    assert (a["action"], a["next"]) == ("up", "light")
+
+
+def test_session_count_comes_from_config(cfg):
+    cfg["weight_guidance"]["up"]["consecutive_sessions"] = 3
+    a = adv(cfg, prior=0)                                # 1 of 3: two more needed -> plain stay
+    assert (a["action"], a["reasons"], a["phrases"]) == ("stay", ["qualified_need_more"], ["weight_stay"])
+    a = adv(cfg, prior=1)                                # 2 of 3: one more -> "if next session goes as well"
+    assert a["phrases"] == ["weight_stay_one_more"]
+    a = adv(cfg, prior=2)                                # 3 of 3
+    assert a["action"] == "up"
+    cfg["weight_guidance"]["up"]["consecutive_sessions"] = 1
+    assert adv(cfg, prior=0)["action"] == "up"           # 1 = the old immediate rule
+
+
+def test_a_session_that_does_not_qualify_resets_the_run(cfg):
+    a = adv(cfg, facts(good=7), prior=1)
+    assert a["action"] == "stay" and not a["up_qualified"] and a["qualifying_streak"] == 0
+
+
+def test_moving_down_stays_immediate(cfg):
+    a = adv(cfg, pain=5, current="light", prior=0)       # one bad session is enough
+    assert (a["action"], a["next"]) == ("down", "none")
+    a = adv(cfg, facts(comp=3), current="heavy", prior=4)  # even after a good run
+    assert (a["action"], a["next"]) == ("down", "light") and not a["up_qualified"]
+
+
+def test_at_max_does_not_need_the_run(cfg):
+    a = adv(cfg, current="light", max_level="light", prior=0)
+    assert a["reasons"] == ["at_max"] and a["phrases"] == ["weight_at_max"] and a["up_qualified"]
+
+
+def test_never_more_than_one_level_per_session(cfg):
     assert adv(cfg, current="none", max_level="heavy")["next"] == "light"
     assert adv(cfg, current="light", max_level="heavy")["next"] == "heavy"
 
@@ -245,12 +298,18 @@ def _post(app, sid, body):
     return s, json.loads(b)
 
 
-def test_route_moves_up_saves_and_returns_audio():
+def test_route_two_good_sessions_in_a_row_then_up():
     store = Store(":memory:")
     pid = store.add_patient({**OK, "physioMaxWeight": "heavy"})
     store.save_session(pid, summary(mode="calibration", baseline={"rom": 100.0}), {})
+    app = _app(store)
+    first = store.save_session(pid, summary(), log_of(rom=95.0))
+    status, body = _post(app, first, {"pain": 2})
+    assert status == 200 and body["advice"]["action"] == "stay"
+    assert [p["key"] for p in body["prompts"]] == ["weight_stay_one_more"]
+    assert body["prompts"][0]["audio"]["en"] == "/audio/en_weight_stay_one_more.mp3"
     sid = store.save_session(pid, summary(), log_of(rom=95.0))
-    status, body = _post(_app(store), sid, {"pain": 2})
+    status, body = _post(app, sid, {"pain": 2})
     assert status == 200
     a = body["advice"]
     assert (a["action"], a["current"], a["next"]) == ("up", "none", "light")
@@ -283,6 +342,69 @@ def test_route_errors(make, body, code):
     store = Store(":memory:")
     status, _ = _post(_app(store), make(store), body)
     assert status == code
+
+
+def test_route_asking_again_for_the_same_session_does_not_count_it_twice():
+    store = Store(":memory:")
+    pid = store.add_patient({**OK, "physioMaxWeight": "heavy"})
+    store.save_session(pid, summary(mode="calibration", baseline={"rom": 100.0}), {})
+    sid = store.save_session(pid, summary(), log_of(rom=95.0))
+    app = _app(store)
+    assert _post(app, sid, {"pain": 1})[1]["advice"]["action"] == "stay"
+    assert _post(app, sid, {"pain": 1})[1]["advice"]["action"] == "stay"
+
+
+# ---------------------------------------------------------------- the qualifying run in storage
+
+def _saved(store, pid, weight="none", qualified=True, advice=True, ex="E3", mode="session"):
+    sid = store.save_session(pid, summary(ex=ex, mode=mode, weight=weight), {})
+    if advice:
+        store.save_advice(sid, 1, {"up_qualified": qualified})
+    return sid
+
+
+def test_streak_counts_good_sessions_in_a_row_at_the_same_weight():
+    s = Store(":memory:")
+    pid = s.add_patient(OK)
+    _saved(s, pid)
+    _saved(s, pid)
+    now = _saved(s, pid, advice=False)
+    assert s.qualifying_streak(pid, "E3", "none", now) == 2
+
+
+@pytest.mark.parametrize("breaker", [
+    {"qualified": False},                    # not all conditions met
+    {"weight": "light"},                     # another weight in between
+    {"advice": False},                       # pain never asked: cannot know
+])
+def test_streak_is_broken(breaker):
+    s = Store(":memory:")
+    pid = s.add_patient(OK)
+    _saved(s, pid)
+    _saved(s, pid, **breaker)
+    now = _saved(s, pid, advice=False)
+    assert s.qualifying_streak(pid, "E3", "none", now) == 0
+
+
+def test_streak_ignores_calibration_other_exercises_and_other_patients():
+    s = Store(":memory:")
+    pid, other = s.add_patient(OK), s.add_patient(OK)
+    _saved(s, pid)
+    _saved(s, pid, mode="calibration", qualified=False)
+    _saved(s, pid, ex="E4", qualified=False)
+    _saved(s, other, qualified=False)
+    now = _saved(s, pid, advice=False)
+    assert s.qualifying_streak(pid, "E3", "none", now) == 1
+    assert s.qualifying_streak(None, "E3", "none", now) == 0
+
+
+def test_older_saved_advice_without_the_flag_does_not_count():
+    s = Store(":memory:")
+    pid = s.add_patient(OK)
+    sid = s.save_session(pid, summary(), {})
+    s.save_advice(sid, 1, {"action": "stay"})            # saved before the 2-for-2 rule
+    now = _saved(s, pid, advice=False)
+    assert s.qualifying_streak(pid, "E3", "none", now) == 0
 
 
 # ---------------------------------------------------------------- never during a set

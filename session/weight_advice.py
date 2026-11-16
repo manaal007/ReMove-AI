@@ -6,8 +6,16 @@ Rules from config/thresholds.yaml weight_guidance (TO CONFIRM WITH PHYSIO):
         compensation in >= down.min_compensation_reps reps,
         set range < down.max_range_frac x reference range (dropped more than 20%)
   up    if ALL: good reps >= up.min_good_reps, compensation reps <= up.max_compensation_reps,
-        pain <= up.max_pain, set range >= up.min_range_frac x no-weight baseline range
+        pain <= up.max_pain, set range >= up.min_range_frac x no-weight baseline range,
+        in up.consecutive_sessions sessions in a row (2-for-2 rule) at the same exercise and
+        weight. Before that the advice is stay, with "if next session goes as well, you can
+        try the next weight" when one more such session is needed.
   stay  otherwise
+Moving down is immediate: one bad session is enough.
+
+The run of qualifying sessions before this one (prior_streak) comes from the saved
+advice of earlier sessions (storage.db.store.Store.qualifying_streak): each advice
+records up_qualified = all move-up conditions met.
 Limits: one level per session going up; never above the physio's max level (health
 form; unknown = none, the safe default). If the patient is already above that max,
 the advice is the max itself, even if that is two levels down: the max wins.
@@ -23,6 +31,7 @@ import numpy as np
 
 REASONS = ("pain_high", "compensation", "range_drop", "above_max",            # down
            "all_criteria_met",                                                  # up
+           "qualified_need_more",                                               # stay: 2-for-2
            "at_max", "few_good_reps", "some_compensation", "pain_some",         # stay: why not up
            "range_short", "no_reference")
 
@@ -40,8 +49,10 @@ def set_facts(log):
     }
 
 
-def advise(facts, pain, current, max_level, no_weight_rom, cfg):
-    """Advice dict: action up | down | stay, current / next level, reasons, phrases to speak."""
+def advise(facts, pain, current, max_level, no_weight_rom, cfg, prior_streak=0):
+    """Advice dict: action up | down | stay, current / next level, reasons, phrases to speak.
+    prior_streak: sessions in a row right before this one, same exercise and weight, that met
+    every move-up condition."""
     g = cfg["weight_guidance"]
     levels = list(g["levels"])
     if current not in levels:
@@ -76,12 +87,18 @@ def advise(facts, pain, current, max_level, no_weight_rom, cfg):
     elif frac < up["min_range_frac"]:
         not_up.append("range_short")
 
-    if down_reasons:
+    up_qualified = not down_reasons and not not_up
+    streak = int(prior_streak) + 1 if up_qualified else 0
+    needed = int(up["consecutive_sessions"])
+    if down_reasons:                                                 # moving down is immediate
         nxt, reasons = max(cur - 1, 0), down_reasons
-    elif not not_up:
-        nxt, reasons = cur + 1, ["all_criteria_met"]                # one level at most
-        if nxt > top:
+    elif up_qualified:
+        if cur + 1 > top:
             nxt, reasons = cur, ["at_max"]
+        elif streak >= needed:
+            nxt, reasons = cur + 1, ["all_criteria_met"]            # one level at most
+        else:
+            nxt, reasons = cur, ["qualified_need_more"]
     else:
         nxt, reasons = cur, not_up
     if nxt > top:                                                    # never above the physio's max
@@ -93,8 +110,12 @@ def advise(facts, pain, current, max_level, no_weight_rom, cfg):
         phrases = [f"weight_up_{levels[nxt]}"]
     elif action == "down":
         phrases = [f"weight_down_{levels[nxt]}"]
+    elif "at_max" in reasons:
+        phrases = ["weight_at_max"]
+    elif "qualified_need_more" in reasons and needed - streak == 1:
+        phrases = ["weight_stay_one_more"]
     else:
-        phrases = ["weight_at_max" if "at_max" in reasons else "weight_stay"]
+        phrases = ["weight_stay"]
     if talk:
         phrases.append("talk_to_physio")
     return {
@@ -105,4 +126,6 @@ def advise(facts, pain, current, max_level, no_weight_rom, cfg):
         "range": None if facts.get("range") is None else round(facts["range"], 1),
         "no_weight_range": None if not no_weight_rom else round(float(no_weight_rom), 1),
         "range_frac": None if frac is None else round(frac, 3),
+        "up_qualified": up_qualified,          # saved: the next session's prior_streak counts these
+        "qualifying_streak": streak, "sessions_needed": needed,
     }

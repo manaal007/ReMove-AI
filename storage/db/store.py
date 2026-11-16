@@ -144,6 +144,24 @@ class Store:
                 return float(rom)
         return None
 
+    def qualifying_streak(self, patient_id, exercise, weight, before_sid):
+        """Exercise sessions in a row right before `before_sid` (same patient, exercise and
+        weight) whose saved advice met every move-up condition. The run stops at a session
+        with another weight, one that did not qualify, or one with no advice (pain never asked)."""
+        if patient_id is None:
+            return 0
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT weight, advice FROM sessions WHERE patient_id = ? AND exercise = ? AND mode = 'session' "
+                "AND id < ? ORDER BY id DESC", (patient_id, exercise, before_sid)).fetchall()
+        n = 0
+        for r in rows:
+            advice = json.loads(r["advice"]) if r["advice"] else None
+            if r["weight"] != weight or not advice or not advice.get("up_qualified"):
+                break
+            n += 1
+        return n
+
     def save_advice(self, sid, pain, advice):
         with self.lock, self.db:
             self.db.execute("UPDATE sessions SET pain_after = ?, advice = ? WHERE id = ?",
